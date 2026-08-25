@@ -1,378 +1,351 @@
+import json
+import os
+import html as html_lib
+from pathlib import Path
+
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-import os
-import json
-from datetime import datetime
 
-from config import BLOG_ID
-from blog_content import save_post
-
-
+TOKEN_FILE = "token.json"
+CREDENTIALS_FILE = "credentials.json"
 
 SCOPES = [
     "https://www.googleapis.com/auth/blogger"
 ]
 
 
+try:
+    from config import BLOG_ID
+except (ImportError, AttributeError):
+    BLOG_ID = os.environ.get("BLOG_ID", "")
 
-def get_service():
 
-    creds = None
+def _read_json(path):
+    file_path = Path(path)
+
+    if not file_path.exists():
+        return {}
+
+    with file_path.open(
+        "r",
+        encoding="utf-8"
+    ) as f:
+        return json.load(f)
 
 
-    if os.path.exists("token.json"):
+def _get_credentials():
+    """
+    Load OAuth credentials from token.json.
 
-        creds = Credentials.from_authorized_user_file(
-            "token.json",
-            SCOPES
+    IMPORTANT:
+    GitHub Actions is headless, so this function NEVER
+    tries to open a browser or run an interactive OAuth flow.
+    """
+
+    token_data = _read_json(TOKEN_FILE)
+
+    if not token_data:
+        raise RuntimeError(
+            "token.json was not created. "
+            "Check the TOKEN_JSON GitHub secret."
         )
 
+    client_data = _read_json(CREDENTIALS_FILE)
 
-    if not creds or not creds.valid:
+    oauth_config = (
+        client_data.get("installed")
+        or client_data.get("web")
+        or {}
+    )
 
+    token = token_data.get("token")
 
-        flow = InstalledAppFlow.from_client_secrets_file(
+    refresh_token = token_data.get(
+        "refresh_token"
+    )
 
-            "credentials.json",
+    client_id = (
+        token_data.get("client_id")
+        or oauth_config.get("client_id")
+    )
 
-            SCOPES
+    client_secret = (
+        token_data.get("client_secret")
+        or oauth_config.get("client_secret")
+    )
 
+    token_uri = (
+        token_data.get("token_uri")
+        or oauth_config.get("token_uri")
+        or "https://oauth2.googleapis.com/token"
+    )
+
+    scopes = (
+        token_data.get("scopes")
+        or SCOPES
+    )
+
+    if isinstance(scopes, str):
+        scopes = [scopes]
+
+    if not client_id:
+        raise RuntimeError(
+            "Google OAuth client_id is missing."
         )
 
-
-        creds = flow.run_local_server(
-            port=0
+    if not client_secret:
+        raise RuntimeError(
+            "Google OAuth client_secret is missing."
         )
 
+    if not token and not refresh_token:
+        raise RuntimeError(
+            "TOKEN_JSON does not contain a usable "
+            "access token or refresh token."
+        )
 
-        with open(
-            "token.json",
-            "w"
-        ) as token:
+    creds = Credentials(
+        token=token,
+        refresh_token=refresh_token,
+        token_uri=token_uri,
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=scopes,
+    )
 
-            token.write(
-                creds.to_json()
+    # GitHub Actions must never open a browser.
+    # Refresh the OAuth access token directly.
+    if refresh_token:
+        try:
+            creds.refresh(Request())
+
+            # Update only the temporary runtime token.json.
+            Path(TOKEN_FILE).write_text(
+                creds.to_json(),
+                encoding="utf-8"
             )
 
+            print(
+                "Google OAuth token refreshed successfully."
+            )
 
+        except Exception as exc:
+            raise RuntimeError(
+                "Google OAuth token refresh failed: "
+                f"{exc}"
+            ) from exc
+
+    if not creds.token:
+        raise RuntimeError(
+            "Google OAuth access token is unavailable."
+        )
+
+    return creds
+
+
+def _get_blogger_service():
+    creds = _get_credentials()
 
     return build(
         "blogger",
         "v3",
-        credentials=creds
+        credentials=creds,
+        cache_discovery=False,
     )
 
 
-
-
-
-
-
-def create_json_ld(
-
-        title,
-
-        description,
-
-        image_url
-
-):
-
-
-    schema = {
-
-
-        "@context":
-
-        "https://schema.org",
-
-
-
-        "@type":
-
-        "Article",
-
-
-
-        "headline":
-
-        title,
-
-
-
-        "description":
-
-        description,
-
-
-
-        "image":
-
-        [
-
-            image_url
-
-        ] if image_url else [],
-
-
-
-
-        "author":
-
-        {
-
-            "@type":
-
-            "Organization",
-
-
-            "name":
-
-            "TechBangla"
-
-        },
-
-
-
-
-        "publisher":
-
-        {
-
-            "@type":
-
-            "Organization",
-
-
-            "name":
-
-            "TechBangla",
-
-
-            "logo":
-
-            {
-
-                "@type":
-
-                "ImageObject",
-
-
-                "url":
-
-                "https://blogger.googleusercontent.com/img/b/R29vZ2xl/"
-
-            }
-
-        },
-
-
-
-
-        "datePublished":
-
-        datetime.now().isoformat(),
-
-
-
-
-        "mainEntityOfPage":
-
-        {
-
-            "@type":
-
-            "WebPage",
-
-            "@id":
-
-            "https://techbangla996.blogspot.com"
-
-        }
-
-
-    }
-
-
-
-    return f"""
-
-<script type="application/ld+json">
-
-{json.dumps(schema, ensure_ascii=False)}
-
-</script>
-
-"""
-
-
-
-
-
-
+def _get_blog_id(service):
+    """
+    Use BLOG_ID from runtime config when available.
+    Otherwise automatically discover the Blogger blog.
+    """
+
+    configured_blog_id = str(
+        BLOG_ID or ""
+    ).strip()
+
+    if configured_blog_id:
+        return configured_blog_id
+
+    response = (
+        service
+        .blogs()
+        .listByUser(
+            userId="self"
+        )
+        .execute()
+    )
+
+    blogs = response.get(
+        "items",
+        []
+    )
+
+    if not blogs:
+        raise RuntimeError(
+            "No Blogger blog was found for "
+            "the authorized Google account."
+        )
+
+    # Prefer a TechBangla blog if available.
+    for blog in blogs:
+        name = str(
+            blog.get("name", "")
+        ).lower()
+
+        url = str(
+            blog.get("url", "")
+        ).lower()
+
+        if (
+            "techbangla" in name
+            or "techbangla" in url
+        ):
+            return str(blog["id"])
+
+    # If only one blog exists, use it.
+    if len(blogs) == 1:
+        return str(
+            blogs[0]["id"]
+        )
+
+    names = ", ".join(
+        str(
+            blog.get(
+                "name",
+                "(unnamed)"
+            )
+        )
+        for blog in blogs
+    )
+
+    raise RuntimeError(
+        "Multiple Blogger blogs were found, "
+        "but TechBangla could not be identified: "
+        + names
+    )
 
 
 def create_post(
-
-        title,
-
-        content,
-
-        labels=None,
-
-        search_description=None,
-
-        image_url=None
-
+    title,
+    content,
+    labels=None,
+    search_description="",
+    image_url=None,
 ):
+    """
+    Publish one post to Blogger without interactive OAuth.
+    """
 
-
-    service = get_service()
-
-
-
-    schema = create_json_ld(
-
-        title,
-
-        search_description,
-
-        image_url
-
+    print(
+        "Connecting to Blogger API..."
     )
 
+    service = _get_blogger_service()
 
+    blog_id = _get_blog_id(
+        service
+    )
 
-
-    image_html = ""
-
-
-
-    if image_url:
-
-
-        image_html = f"""
-
-<div class="separator"
-
-style="clear: both; text-align:center;">
-
-
-<img
-
-src="{image_url}"
-
-alt="{title}"
-
-title="{title}"
-
-loading="eager"
-
-width="1200"
-
-height="675"
-
-style="max-width:100%;height:auto;">
-
-
-</div>
-
-<br/>
-
-"""
-
-
-
-
+    print(
+        f"Blogger Blog ID ready: {blog_id}"
+    )
 
     final_content = (
-
-        schema
-
-        + image_html
-
-        + content
-
+        content or ""
     )
 
+    # Add featured image to top of Blogger article.
+    if image_url:
+        safe_image_url = html_lib.escape(
+            str(image_url),
+            quote=True
+        )
 
+        safe_title = html_lib.escape(
+            str(title),
+            quote=True
+        )
 
+        image_html = f"""
+        <div class="separator"
+             style="clear: both; text-align: center;">
+          <img
+            src="{safe_image_url}"
+            alt="{safe_title}"
+            style="max-width:100%;height:auto;"
+          />
+        </div>
+        """
 
+        final_content = (
+            image_html
+            + "\n"
+            + final_content
+        )
 
-    post = {
+    clean_labels = []
 
+    for label in labels or []:
+        label = str(
+            label
+        ).strip()
 
-        "kind":
+        if label:
+            clean_labels.append(
+                label
+            )
 
-        "blogger#post",
-
-
-
-        "title":
-
-        title,
-
-
-
-        "content":
-
-        final_content
-
+    post_body = {
+        "kind": "blogger#post",
+        "title": str(title),
+        "content": final_content,
     }
 
+    if clean_labels:
+        post_body[
+            "labels"
+        ] = clean_labels
 
-
-
-    if labels:
-
-        post["labels"] = labels
-
-
-
-
-    if search_description:
-
-        post["searchDescription"] = search_description
-
-
-
-
-
-
-    result = service.posts().insert(
-
-
-        blogId=BLOG_ID,
-
-
-        body=post,
-
-
-        isDraft=False
-
-
-    ).execute()
-
-
-
-
-
-    print("Published:")
-
-    print(result["url"])
-
-
-
-
-
-    save_post(
-
-        title,
-
-        result["url"],
-
-        labels[0] if labels else "Technology"
-
+    print(
+        "Publishing article to Blogger..."
     )
+
+    result = (
+        service
+        .posts()
+        .insert(
+            blogId=blog_id,
+            body=post_body,
+            isDraft=False,
+        )
+        .execute()
+    )
+
+    post_url = result.get(
+        "url",
+        ""
+    )
+
+    post_id = result.get(
+        "id",
+        ""
+    )
+
+    print(
+        "Blogger post published successfully."
+    )
+
+    print(
+        "Post ID:",
+        post_id
+    )
+
+    print(
+        "Post URL:",
+        post_url
+    )
+
+    return result
