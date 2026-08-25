@@ -1,16 +1,12 @@
 name: TechBangla - 2 Posts Daily
 
 on:
-  # Bangladesh time: 9:17 AM
-  # Bangladesh time: 9:17 PM
-  schedule:
-    - cron: '17 9 * * *'
-      timezone: 'Asia/Dhaka'
+  # Bangladesh Time: 09:17 AM
+  - schedule:
+      - cron: '17 3 * * *'
+      - cron: '17 15 * * *'
 
-    - cron: '17 21 * * *'
-      timezone: 'Asia/Dhaka'
-
-  # Manual Run workflow button-ও থাকবে
+  # Manual run button
   workflow_dispatch:
 
 permissions:
@@ -26,111 +22,188 @@ jobs:
     timeout-minutes: 30
 
     env:
-      # GitHub Repository Secrets
+      # Repository Secrets
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-      # আপনার GitHub secret-এর আসল নাম CREDENTIALS_JSON
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
-
-      # আপনার GitHub secret-এর আসল নাম TOKEN_JSON
       GOOGLE_TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
 
-      # GitHub নিজে automatically এই token দেয়
+      # GitHub automatically provides this token
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # GitHub repository information
+      GITHUB_USERNAME: ${{ github.repository_owner }}
+      GITHUB_REPO: ${{ github.event.repository.name }}
+      REPO_NAME: ${{ github.event.repository.name }}
+
     steps:
-      # -------------------------------------------------
-      # 1. Repository checkout
-      # -------------------------------------------------
+
+      # ==================================================
+      # 1. Checkout
+      # ==================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # -------------------------------------------------
-      # 2. Python setup
-      # -------------------------------------------------
+      # ==================================================
+      # 2. Python
+      # ==================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      # -------------------------------------------------
-      # 3. Install Python packages
-      # -------------------------------------------------
+      # ==================================================
+      # 3. Dependencies
+      # ==================================================
       - name: Install dependencies
         shell: bash
         run: |
           set -e
+
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # -------------------------------------------------
-      # 4. Check GitHub secrets + create runtime files
-      # -------------------------------------------------
+          # Make sure PIL is available
+          pip install Pillow
+
+      # ==================================================
+      # 4. Create credentials + config.py
+      # ==================================================
       - name: Build private runtime files
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Checking required GitHub secrets..."
+          echo "Checking repository secrets..."
 
           if [ -z "${GEMINI_API_KEY:-}" ]; then
-            echo "::error::Missing repository secret: GEMINI_API_KEY"
+            echo "::error::Missing secret: GEMINI_API_KEY"
             exit 1
           fi
 
           if [ -z "${GOOGLE_CREDENTIALS_JSON:-}" ]; then
-            echo "::error::Missing repository secret: CREDENTIALS_JSON"
+            echo "::error::Missing secret: CREDENTIALS_JSON"
             exit 1
           fi
 
           if [ -z "${GOOGLE_TOKEN_JSON:-}" ]; then
-            echo "::error::Missing repository secret: TOKEN_JSON"
+            echo "::error::Missing secret: TOKEN_JSON"
             exit 1
           fi
 
-          echo "Required secrets found."
+          echo "All required secrets found."
 
+          # Create Google OAuth files
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
           printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
 
-          # Runtime-only config.py
+          # Backup config.py if repository already contains one
+          if [ -f "config.py" ]; then
+            cp config.py .config.py.backup
+          fi
+
+          # Build runtime config
           cat > config.py <<'PY'
           import json
           import os
 
-          GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-          GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+          # ==============================================
+          # Gemini
+          # ==============================================
+          GEMINI_API_KEY = os.environ.get(
+              "GEMINI_API_KEY",
+              ""
+          )
+
+          # ==============================================
+          # GitHub
+          # ==============================================
+          GITHUB_TOKEN = os.environ.get(
+              "GITHUB_TOKEN",
+              ""
+          )
+
+          GITHUB_USERNAME = os.environ.get(
+              "GITHUB_USERNAME",
+              ""
+          )
+
+          GITHUB_REPO = os.environ.get(
+              "GITHUB_REPO",
+              ""
+          )
+
+          # Some scripts may use REPO_NAME instead
+          REPO_NAME = os.environ.get(
+              "REPO_NAME",
+              GITHUB_REPO
+          )
+
+          GITHUB_REPOSITORY = os.environ.get(
+              "GITHUB_REPOSITORY",
+              f"{GITHUB_USERNAME}/{GITHUB_REPO}"
+          )
+
+          GITHUB_BRANCH = os.environ.get(
+              "GITHUB_REF_NAME",
+              "main"
+          )
+
+          GITHUB_API_URL = os.environ.get(
+              "GITHUB_API_URL",
+              "https://api.github.com"
+          )
+
+          # ==============================================
+          # Google OAuth
+          # ==============================================
+          CREDENTIALS_FILE = "credentials.json"
+          TOKEN_FILE = "token.json"
+
+          CLIENT_ID = ""
+          CLIENT_SECRET = ""
 
           try:
-              _oauth_raw = os.environ.get(
+              credentials_raw = os.environ.get(
                   "GOOGLE_CREDENTIALS_JSON",
                   "{}"
               )
 
-              _oauth = json.loads(_oauth_raw)
-              _oauth = (
-                  _oauth.get("installed")
-                  or _oauth.get("web")
+              credentials_data = json.loads(
+                  credentials_raw
+              )
+
+              oauth_data = (
+                  credentials_data.get("installed")
+                  or credentials_data.get("web")
                   or {}
               )
 
-              CLIENT_SECRET = _oauth.get(
+              CLIENT_ID = oauth_data.get(
+                  "client_id",
+                  ""
+              )
+
+              CLIENT_SECRET = oauth_data.get(
                   "client_secret",
                   ""
               )
 
           except Exception:
+              CLIENT_ID = ""
               CLIENT_SECRET = ""
           PY
 
-          echo "Runtime files created successfully."
+          echo "Runtime config created."
 
-      # -------------------------------------------------
-      # 5. Replace old Gemini 2.0 models
-      # -------------------------------------------------
+          echo "GitHub username: ${GITHUB_USERNAME}"
+          echo "GitHub repo: ${GITHUB_REPO}"
+
+      # ==================================================
+      # 5. Gemini model
+      # ==================================================
       - name: Use supported Gemini model
         shell: bash
         run: |
@@ -148,34 +221,56 @@ jobs:
               "$f"
           done
 
-          echo "Gemini model configuration checked."
+          echo "Gemini model checked."
 
-      # -------------------------------------------------
-      # 6. Run TechBangla bot
-      # -------------------------------------------------
+      # ==================================================
+      # 6. Check important Python imports
+      # ==================================================
+      - name: Check Python packages
+        shell: bash
+        run: |
+          set -e
+
+          python - <<'PY'
+          from PIL import Image
+          import requests
+          import google.auth
+
+          print("Required Python packages OK.")
+          PY
+
+      # ==================================================
+      # 7. Publish post
+      # ==================================================
       - name: Publish one blog post
         shell: bash
         run: |
           set -e
+
           echo "Starting TechBangla blog publisher..."
           python main.py
 
-      # -------------------------------------------------
-      # 7. Remove private files
-      # -------------------------------------------------
+      # ==================================================
+      # 8. Remove secrets/runtime files
+      # ==================================================
       - name: Remove private runtime files
         if: always()
         shell: bash
         run: |
-          rm -f config.py
           rm -f credentials.json
           rm -f token.json
 
+          if [ -f ".config.py.backup" ]; then
+            mv .config.py.backup config.py
+          else
+            rm -f config.py
+          fi
+
           echo "Private runtime files removed."
 
-      # -------------------------------------------------
-      # 8. Save posted-topic state back to GitHub
-      # -------------------------------------------------
+      # ==================================================
+      # 9. Save bot state
+      # ==================================================
       - name: Save bot state
         if: success()
         shell: bash
@@ -195,11 +290,11 @@ jobs:
           fi
 
           if git diff --cached --quiet; then
-            echo "No bot state changes to save."
+            echo "No state changes to save."
             exit 0
           fi
 
           git commit -m "Update bot state [skip ci]"
           git push
 
-          echo "Bot state saved successfully."
+          echo "Bot state saved."
