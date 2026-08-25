@@ -2,10 +2,10 @@ name: TechBangla - 2 Posts Daily
 
 on:
   schedule:
-    # 03:17 UTC = 09:17 AM Bangladesh
+    # Bangladesh 09:17 AM
     - cron: '17 3 * * *'
 
-    # 15:17 UTC = 09:17 PM Bangladesh
+    # Bangladesh 09:17 PM
     - cron: '17 15 * * *'
 
   workflow_dispatch:
@@ -33,10 +33,12 @@ jobs:
       GITHUB_USERNAME: ${{ github.repository_owner }}
       GITHUB_REPO: ${{ github.event.repository.name }}
 
+      GEMINI_MODEL: gemini-2.5-flash-lite
+
     steps:
 
       # ==========================================
-      # 1. Checkout repository
+      # 1. Checkout
       # ==========================================
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,7 +46,7 @@ jobs:
           fetch-depth: 0
 
       # ==========================================
-      # 2. Setup Python
+      # 2. Python
       # ==========================================
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,107 +55,361 @@ jobs:
           cache: 'pip'
 
       # ==========================================
-      # 3. Install dependencies
+      # 3. Dependencies
       # ==========================================
       - name: Install dependencies
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-          # Required by image_quality.py
           pip install Pillow
 
       # ==========================================
-      # 4. Check required GitHub secrets
+      # 4. Build runtime config
       # ==========================================
-      - name: Check repository secrets
+      - name: Build runtime config
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ -z "${GEMINI_API_KEY:-}" ]; then
-            echo "::error::Missing secret: GEMINI_API_KEY"
+          [ -n "${GEMINI_API_KEY:-}" ] || {
+            echo "::error::Missing secret GEMINI_API_KEY"
             exit 1
-          fi
+          }
 
-          if [ -z "${GOOGLE_CREDENTIALS_JSON:-}" ]; then
-            echo "::error::Missing secret: CREDENTIALS_JSON"
+          [ -n "${GOOGLE_CREDENTIALS_JSON:-}" ] || {
+            echo "::error::Missing secret CREDENTIALS_JSON"
             exit 1
-          fi
+          }
 
-          if [ -z "${GOOGLE_TOKEN_JSON:-}" ]; then
-            echo "::error::Missing secret: TOKEN_JSON"
+          [ -n "${GOOGLE_TOKEN_JSON:-}" ] || {
+            echo "::error::Missing secret TOKEN_JSON"
             exit 1
-          fi
-
-          echo "Required secrets are available."
-
-      # ==========================================
-      # 5. Create Google OAuth runtime files
-      # IMPORTANT: config.py is NOT overwritten
-      # ==========================================
-      - name: Build Google runtime files
-        shell: bash
-        run: |
-          set -euo pipefail
+          }
 
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
           printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
 
-          echo "credentials.json created."
-          echo "token.json created."
-
-      # ==========================================
-      # 6. Verify original config.py
-      # ==========================================
-      - name: Check config file
-        shell: bash
-        run: |
-          set -e
-
-          if [ ! -f "config.py" ]; then
-            echo "::error::config.py not found in repository."
-            exit 1
-          fi
-
-          echo "Original config.py found."
-
           python - <<'PY'
-          import config
+          import json
+          import os
+          import re
+          import textwrap
+          from pathlib import Path
 
-          required = [
-              "BLOG_ID",
-              "GITHUB_USERNAME",
-          ]
+          from google.auth.transport.requests import Request
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
 
-          missing = [
-              name
-              for name in required
-              if not hasattr(config, name)
-          ]
 
-          if missing:
+          credentials_data = json.loads(
+              os.environ["GOOGLE_CREDENTIALS_JSON"]
+          )
+
+          token_data = json.loads(
+              os.environ["GOOGLE_TOKEN_JSON"]
+          )
+
+
+          oauth_app = (
+              credentials_data.get("installed")
+              or credentials_data.get("web")
+              or {}
+          )
+
+
+          client_id = (
+              token_data.get("client_id")
+              or oauth_app.get("client_id", "")
+          )
+
+          client_secret = (
+              token_data.get("client_secret")
+              or oauth_app.get("client_secret", "")
+          )
+
+          token_uri = (
+              token_data.get("token_uri")
+              or "https://oauth2.googleapis.com/token"
+          )
+
+          scopes = (
+              token_data.get("scopes")
+              or ["https://www.googleapis.com/auth/blogger"]
+          )
+
+
+          if isinstance(scopes, str):
+              scopes = [scopes]
+
+
+          creds = Credentials(
+              token=token_data.get("token"),
+              refresh_token=token_data.get("refresh_token"),
+              token_uri=token_uri,
+              client_id=client_id,
+              client_secret=client_secret,
+              scopes=scopes,
+          )
+
+
+          if not creds.valid:
+              if not creds.refresh_token:
+                  raise RuntimeError(
+                      "Google token is invalid and has no refresh_token."
+                  )
+
+              creds.refresh(Request())
+
+
+          blogger = build(
+              "blogger",
+              "v3",
+              credentials=creds,
+              cache_discovery=False,
+          )
+
+
+          blogs = (
+              blogger
+              .blogs()
+              .listByUser(userId="self")
+              .execute()
+              .get("items", [])
+          )
+
+
+          if not blogs:
               raise RuntimeError(
-                  "Missing variables in config.py: "
-                  + ", ".join(missing)
+                  "No Blogger blog found for the authorized Google account."
               )
 
-          print("config.py required variables OK.")
+
+          def norm(value):
+              return re.sub(
+                  r"[^a-z0-9]+",
+                  "",
+                  (value or "").lower(),
+              )
+
+
+          preferred = [
+              blog
+              for blog in blogs
+              if (
+                  "techbangla" in norm(blog.get("name"))
+                  or
+                  "techbangla" in norm(blog.get("url"))
+              )
+          ]
+
+
+          if preferred:
+              selected = preferred[0]
+
+          elif len(blogs) == 1:
+              selected = blogs[0]
+
+          else:
+              names = ", ".join(
+                  blog.get("name", "(unnamed)")
+                  for blog in blogs
+              )
+
+              raise RuntimeError(
+                  "Multiple Blogger blogs found and none "
+                  "matched TechBangla: "
+                  + names
+              )
+
+
+          blog_id = str(selected["id"])
+
+
+          config_text = f"""
+          import os
+
+          GEMINI_API_KEY = os.environ.get(
+              "GEMINI_API_KEY",
+              ""
+          )
+
+          GEMINI_MODEL = os.environ.get(
+              "GEMINI_MODEL",
+              "gemini-2.5-flash-lite"
+          )
+
+          BLOG_ID = {blog_id!r}
+
+          CLIENT_ID = {client_id!r}
+
+          CLIENT_SECRET = {client_secret!r}
+
+          GITHUB_USERNAME = os.environ.get(
+              "GITHUB_USERNAME",
+              ""
+          )
+
+          GITHUB_TOKEN = os.environ.get(
+              "GITHUB_TOKEN",
+              ""
+          )
+
+          GITHUB_REPO = os.environ.get(
+              "GITHUB_REPO",
+              ""
+          )
+
+          REPO_NAME = GITHUB_REPO
+
+          GITHUB_BRANCH = os.environ.get(
+              "GITHUB_REF_NAME",
+              "main"
+          )
+
+          GITHUB_API_URL = os.environ.get(
+              "GITHUB_API_URL",
+              "https://api.github.com"
+          )
+
+          CREDENTIALS_FILE = "credentials.json"
+
+          TOKEN_FILE = "token.json"
+
+          SCOPES = {scopes!r}
+
+          BLOGGER_SCOPES = SCOPES
+
+
+          def __getattr__(name):
+              if name.isupper():
+                  return os.environ.get(name, "")
+
+              raise AttributeError(name)
+          """
+
+
+          Path("config.py").write_text(
+              textwrap.dedent(config_text).lstrip(),
+              encoding="utf-8",
+          )
+
+
+          print("Runtime config created.")
+          print(
+              "Selected Blogger blog:",
+              selected.get("name", "(unnamed)")
+          )
           PY
 
       # ==========================================
-      # 7. Use Gemini 2.5 Flash Lite
+      # 5. Check ALL imports from config.py
+      # ==========================================
+      - name: Check config imports
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import ast
+          import glob
+          import importlib
+
+
+          names = set()
+
+
+          for path in glob.glob("*.py"):
+
+              if path == "config.py":
+                  continue
+
+              with open(
+                  path,
+                  "r",
+                  encoding="utf-8",
+                  errors="ignore",
+              ) as f:
+
+                  try:
+                      tree = ast.parse(
+                          f.read(),
+                          filename=path,
+                      )
+
+                  except SyntaxError:
+                      continue
+
+
+              for node in ast.walk(tree):
+
+                  if (
+                      isinstance(node, ast.ImportFrom)
+                      and node.module == "config"
+                  ):
+
+                      for alias in node.names:
+                          names.add(alias.name)
+
+
+          config = importlib.import_module("config")
+
+
+          required_nonempty = {
+              "BLOG_ID",
+              "GEMINI_API_KEY",
+              "GITHUB_USERNAME",
+              "GITHUB_TOKEN",
+          }
+
+
+          missing = []
+
+
+          for name in sorted(names):
+
+              value = getattr(
+                  config,
+                  name
+              )
+
+              if (
+                  name in required_nonempty
+                  and not value
+              ):
+                  missing.append(name)
+
+
+          if missing:
+
+              raise RuntimeError(
+                  "Required config values are empty: "
+                  + ", ".join(missing)
+              )
+
+
+          print(
+              "Config imports resolved:",
+              ", ".join(sorted(names))
+              or "(none)"
+          )
+          PY
+
+      # ==========================================
+      # 6. Replace old Gemini models at runtime
       # ==========================================
       - name: Use supported Gemini model
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           for f in *.py; do
+
             [ -f "$f" ] || continue
+
+            [ "$f" = "config.py" ] && continue
 
             sed -i \
               's/gemini-2\.0-flash-lite/gemini-2.5-flash-lite/g' \
@@ -162,76 +418,97 @@ jobs:
             sed -i \
               's/gemini-2\.0-flash/gemini-2.5-flash-lite/g' \
               "$f"
+
           done
 
-          echo "Gemini model checked."
-
       # ==========================================
-      # 8. Check Python packages
-      # ==========================================
-      - name: Check Python packages
-        shell: bash
-        run: |
-          set -e
-
-          python - <<'PY'
-          from PIL import Image
-          import requests
-          import google.auth
-
-          print("Python packages OK.")
-          PY
-
-      # ==========================================
-      # 9. Publish one blog post
+      # 7. Publish
       # ==========================================
       - name: Publish one blog post
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "Starting TechBangla blog publisher..."
           python main.py
 
       # ==========================================
-      # 10. Remove runtime secret files
+      # 8. Remove private files
       # ==========================================
       - name: Remove private runtime files
         if: always()
         shell: bash
         run: |
+          rm -f config.py
           rm -f credentials.json
           rm -f token.json
 
-          echo "Private runtime files removed."
-
       # ==========================================
-      # 11. Save bot state
+      # 9. Save bot state
       # ==========================================
       - name: Save bot state
         if: success()
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/techbangla-state
 
-          if [ -f "posted_topics.json" ]; then
-            git add posted_topics.json
-          fi
 
-          if [ -f "blog_posts.json" ]; then
-            git add blog_posts.json
-          fi
+          for f in posted_topics.json blog_posts.json; do
+
+            if [ -f "$f" ]; then
+              cp "$f" "/tmp/techbangla-state/$f"
+            fi
+
+          done
+
+
+          # Remove temporary runtime modifications
+          git reset --hard HEAD
+
+
+          # Restore only bot state
+          for f in posted_topics.json blog_posts.json; do
+
+            if [ -f "/tmp/techbangla-state/$f" ]; then
+
+              cp "/tmp/techbangla-state/$f" "$f"
+
+              git add "$f"
+
+            fi
+
+          done
+
 
           if git diff --cached --quiet; then
-            echo "No bot state changes to save."
+
+            echo "No state changes to save."
+
             exit 0
+
           fi
 
-          git commit -m "Update bot state [skip ci]"
-          git push
 
-          echo "Bot state saved."
+          git config \
+            user.name \
+            "github-actions[bot]"
+
+          git config \
+            user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+
+          git commit \
+            -m "Update bot state [skip ci]"
+
+
+          git pull \
+            --rebase \
+            origin \
+            main
+
+
+          git push \
+            origin \
+            HEAD:main
