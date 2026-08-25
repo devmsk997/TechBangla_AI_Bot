@@ -1,12 +1,13 @@
 name: TechBangla - 2 Posts Daily
 
 on:
-  # Bangladesh Time: 09:17 AM
-  - schedule:
-      - cron: '17 3 * * *'
-      - cron: '17 15 * * *'
+  schedule:
+    - cron: '17 9 * * *'
+      timezone: 'Asia/Dhaka'
 
-  # Manual run button
+    - cron: '17 21 * * *'
+      timezone: 'Asia/Dhaka'
+
   workflow_dispatch:
 
 permissions:
