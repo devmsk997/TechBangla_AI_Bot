@@ -9,10 +9,10 @@ from googleapiclient.discovery import build
 
 # Environment Secrets
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-BLOG_ID_OLD = os.environ.get("BLOG_ID")       # পুরনো সাধারণ ব্লগ
-BLOG_ID_NEW = os.environ.get("BLOG_ID_2")     # নতুন BDStall অ্যাফিলিয়েট ব্লগ
-CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON")
-TOKEN_JSON = os.environ.get("TOKEN_JSON")
+BLOG_ID_OLD = os.environ.get("BLOG_ID")       # পুরনো ব্লগ (TechBangla)
+BLOG_ID_NEW = os.environ.get("BLOG_ID_2")     # নতুন ব্লগ (BD Tech Shop Review)
+CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON") or os.environ.get("GOOGLE_CREDENTIALS_JSON")
+TOKEN_JSON = os.environ.get("TOKEN_JSON") or os.environ.get("GOOGLE_TOKEN_JSON")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -23,13 +23,13 @@ def get_blogger_service():
         creds.refresh(Request())
     return build('blogger', 'v3', credentials=creds)
 
-# পুরনো ব্লগের ইনফো ক্যাটাগরি
+# পুরনো ব্লগের টেক ক্যাটাগরি
 INFO_CATEGORIES = [
     "সাইবার নিরাপত্তা", "টেক রিভিউ", "পার্সোনাল ফাইন্যান্স", 
     "ডিজিটাল মার্কেটিং", "আর্টিফিশিয়াল ইন্টেলিজেন্স"
 ]
 
-# নতুন ব্লগের BDStall অ্যাফিলিয়েট প্রোডাক্ট
+# নতুন ব্লগের BDStall প্রোডাক্ট
 AFFILIATE_PRODUCTS = [
     "Smart Watch with SIM", "Baseus 20000mAh Power Bank", 
     "Solar PTZ Security Camera", "Wireless Earbuds", 
@@ -41,7 +41,7 @@ def generate_post(prompt):
     for attempt in range(max_retries):
         try:
             response = gemini_client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash-lite",
                 contents=prompt
             )
             clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -61,13 +61,13 @@ def publish_post(blogger_service, blog_id, post_data, label):
     }
     posts = blogger_service.posts()
     res = posts.insert(blogId=blog_id, body=body).execute()
-    print(f"Published to Blog ({blog_id}): {res.get('url')}")
+    print(f"Successfully published to Blog ID ({blog_id}): {res.get('url')}")
 
 def main():
     print("🚀 Dual-Blog AI Automation Bot Started")
     blogger_service = get_blogger_service()
 
-    # ১. পুরনো ব্লগে সাধারণ কন্টেন্ট পোস্ট
+    # ১. পুরনো ব্লগে পোস্ট (TechBangla)
     if BLOG_ID_OLD:
         try:
             category = random.choice(INFO_CATEGORIES)
@@ -75,13 +75,13 @@ def main():
             Write an SEO-friendly blog post in Bengali for category: '{category}'.
             STRICTLY return JSON: {{"title": "Title in Bengali", "content": "HTML content using <h2>, <p>"}}
             """
-            print(f"\nGenerating post for OLD blog: {category}")
+            print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
         except Exception as e:
             print(f"Old blog error: {e}")
 
-    # ২. নতুন ব্লগে BDStall অ্যাফিলিয়েট কন্টেন্ট পোস্ট
+    # ২. নতুন অ্যাফিলিয়েট ব্লগে পোস্ট (BD Tech Shop Review)
     if BLOG_ID_NEW:
         try:
             product = random.choice(AFFILIATE_PRODUCTS)
@@ -91,11 +91,13 @@ def main():
             Add a green button at the bottom: '<div style="text-align:center; margin-top:20px;"><a href="#" style="background-color:#28a745; color:white; padding:12px 25px; text-decoration:none; font-weight:bold; border-radius:5px;">অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></div>'
             STRICTLY return JSON: {{"title": "Title in Bengali", "content": "HTML content"}}
             """
-            print(f"\nGenerating review for NEW Affiliate blog: {product}")
+            print(f"\nGenerating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
         except Exception as e:
             print(f"New blog error: {e}")
+    else:
+        print("\n⚠️ BLOG_ID_2 secret not found! Skipping new blog post.")
 
 if __name__ == "__main__":
     main()
