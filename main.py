@@ -7,10 +7,10 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# Environment Secrets
+# Environment Secrets & Fallbacks
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-BLOG_ID_OLD = os.environ.get("BLOG_ID")       # পুরনো ব্লগ (TechBangla)
-BLOG_ID_NEW = os.environ.get("BLOG_ID_2")     # নতুন ব্লগ (BD Tech Shop Review)
+BLOG_ID_OLD = os.environ.get("BLOG_ID")
+BLOG_ID_NEW = os.environ.get("BLOG_ID_2") or os.environ.get("BLOG_ID_NEW")
 CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON") or os.environ.get("GOOGLE_CREDENTIALS_JSON")
 TOKEN_JSON = os.environ.get("TOKEN_JSON") or os.environ.get("GOOGLE_TOKEN_JSON")
 
@@ -23,13 +23,11 @@ def get_blogger_service():
         creds.refresh(Request())
     return build('blogger', 'v3', credentials=creds)
 
-# পুরনো ব্লগের টেক ক্যাটাগরি
 INFO_CATEGORIES = [
     "সাইবার নিরাপত্তা", "টেক রিভিউ", "পার্সোনাল ফাইন্যান্স", 
     "ডিজিটাল মার্কেটিং", "আর্টিফিশিয়াল ইন্টেলিজেন্স"
 ]
 
-# নতুন ব্লগের BDStall প্রোডাক্ট
 AFFILIATE_PRODUCTS = [
     "Smart Watch with SIM", "Baseus 20000mAh Power Bank", 
     "Solar PTZ Security Camera", "Wireless Earbuds", 
@@ -40,8 +38,9 @@ def generate_post(prompt):
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            # আপডেট করা জেমিনাই মডেল ব্যবহার করা হয়েছে
             response = gemini_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=prompt
             )
             clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -61,7 +60,7 @@ def publish_post(blogger_service, blog_id, post_data, label):
     }
     posts = blogger_service.posts()
     res = posts.insert(blogId=blog_id, body=body).execute()
-    print(f"Successfully published to Blog ID ({blog_id}): {res.get('url')}")
+    print(f"✅ Successfully published to Blog ID ({blog_id}): {res.get('url')}")
 
 def main():
     print("🚀 Dual-Blog AI Automation Bot Started")
@@ -79,7 +78,7 @@ def main():
             info_data = generate_post(prompt_info)
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
         except Exception as e:
-            print(f"Old blog error: {e}")
+            print(f"❌ Old blog error: {e}")
 
     # ২. নতুন অ্যাফিলিয়েট ব্লগে পোস্ট (BD Tech Shop Review)
     if BLOG_ID_NEW:
@@ -95,9 +94,9 @@ def main():
             affiliate_data = generate_post(prompt_affiliate)
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
         except Exception as e:
-            print(f"New blog error: {e}")
+            print(f"❌ New blog error: {e}")
     else:
-        print("\n⚠️ BLOG_ID_2 secret not found! Skipping new blog post.")
+        print("\n⚠️ BLOG_ID_2 / BLOG_ID_NEW secret not found!")
 
 if __name__ == "__main__":
     main()
