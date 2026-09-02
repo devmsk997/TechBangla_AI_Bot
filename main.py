@@ -2,6 +2,9 @@ import os
 import json
 import random
 import time
+import urllib.parse
+import urllib.request
+from bs4 import BeautifulSoup
 from google import genai
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -13,6 +16,8 @@ BLOG_ID_OLD = os.environ.get("BLOG_ID")
 BLOG_ID_NEW = os.environ.get("BLOG_ID_2") or os.environ.get("BLOG_ID_NEW")
 CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON") or os.environ.get("GOOGLE_CREDENTIALS_JSON")
 TOKEN_JSON = os.environ.get("TOKEN_JSON") or os.environ.get("GOOGLE_TOKEN_JSON")
+
+AFFILIATE_ID = "379372"
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -29,16 +34,49 @@ INFO_CATEGORIES = [
 ]
 
 AFFILIATE_PRODUCTS = [
-    "Smart Watch with SIM", "Baseus 20000mAh Power Bank", 
-    "Solar PTZ Security Camera", "Wireless Earbuds", 
-    "Electric Shaver for Women", "Baby Ear Wax Cleaning Kit"
+    "Solar PTZ Security Camera", 
+    "Baseus Power Bank", 
+    "Wireless Earbuds", 
+    "Smart Watch",
+    "CC Camera",
+    "Trimmer"
 ]
+
+def fetch_bdstall_affiliate_link(product_name):
+    """BDStall এ প্রোডাক্ট সার্চ করে অটোমেটিক অ্যাফিলিয়েট লিংক তৈরি করে"""
+    try:
+        search_query = urllib.parse.quote_plus(product_name)
+        search_url = f"https://www.bdstall.com/search/?term={search_query}"
+        
+        req = urllib.request.Request(
+            search_url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            html = response.read().decode('utf-8')
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # প্রোডাক্টের লিংক খুঁজে বের করা
+            for a_tag in soup.find_all('a', href=True):
+                href = a_tag['href']
+                if '/details/' in href:
+                    if not href.startswith('http'):
+                        href = "https://www.bdstall.com" + href
+                    final_affiliate_link = f"{href}?ref={AFFILIATE_ID}"
+                    print(f"🔗 Auto-found Affiliate Link: {final_affiliate_link}")
+                    return final_affiliate_link
+                    
+    except Exception as e:
+        print(f"⚠️ Search link fetch failed: {e}")
+    
+    # ব্যাকআপ লিংক (সার্চে লিংক না পেলে বিডি স্টল হোমপেজ উইথ আইডি)
+    return f"https://www.bdstall.com/?ref={AFFILIATE_ID}"
 
 def generate_post(prompt):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # আপডেট করা জেমিনাই মডেল ব্যবহার করা হয়েছে
             response = gemini_client.models.generate_content(
                 model="gemini-3.5-flash-lite",
                 contents=prompt
@@ -84,13 +122,17 @@ def main():
     if BLOG_ID_NEW:
         try:
             product = random.choice(AFFILIATE_PRODUCTS)
+            print(f"\nSearching affiliate link for: {product}")
+            affiliate_url = fetch_bdstall_affiliate_link(product)
+            
             prompt_affiliate = f"""
             Write a high-converting Bengali affiliate product review for: '{product}'.
             Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>. 
-            Add a green button at the bottom: '<div style="text-align:center; margin-top:20px;"><a href="#" style="background-color:#28a745; color:white; padding:12px 25px; text-decoration:none; font-weight:bold; border-radius:5px;">অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></div>'
+            Add a green button at the bottom using this exact URL: '{affiliate_url}'.
+            Button HTML: '<div style="text-align:center; margin-top:20px;"><a href="{affiliate_url}" target="_blank" rel="sponsored" style="background-color:#28a745; color:white; padding:12px 25px; text-decoration:none; font-weight:bold; border-radius:5px;">অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></div>'
             STRICTLY return JSON: {{"title": "Title in Bengali", "content": "HTML content"}}
             """
-            print(f"\nGenerating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
+            print(f"Generating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
         except Exception as e:
