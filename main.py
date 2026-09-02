@@ -57,7 +57,6 @@ def fetch_bdstall_affiliate_link(product_name):
             html = response.read().decode('utf-8')
             soup = BeautifulSoup(html, 'html.parser')
             
-            # প্রোডাক্টের লিংক খুঁজে বের করা
             for a_tag in soup.find_all('a', href=True):
                 href = a_tag['href']
                 if '/details/' in href:
@@ -70,7 +69,6 @@ def fetch_bdstall_affiliate_link(product_name):
     except Exception as e:
         print(f"⚠️ Search link fetch failed: {e}")
     
-    # ব্যাকআপ লিংক (সার্চে লিংক না পেলে বিডি স্টল হোমপেজ উইথ আইডি)
     return f"https://www.bdstall.com/?ref={AFFILIATE_ID}"
 
 def generate_post(prompt):
@@ -110,7 +108,8 @@ def main():
             category = random.choice(INFO_CATEGORIES)
             prompt_info = f"""
             Write an SEO-friendly blog post in Bengali for category: '{category}'.
-            STRICTLY return JSON: {{"title": "Title in Bengali", "content": "HTML content using <h2>, <p>"}}
+            STRICTLY return JSON with keys "title" and "content".
+            The "content" must be valid HTML using <h2>, <p>, <ul> tags.
             """
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
@@ -125,15 +124,25 @@ def main():
             print(f"\nSearching affiliate link for: {product}")
             affiliate_url = fetch_bdstall_affiliate_link(product)
             
+            # নিখুঁত বাটনের HTML যা Gemini পরিবর্তন করবে না
+            button_html = f'<p style="text-align:center; margin-top:30px;"><a href="{affiliate_url}" target="_blank" rel="sponsored" style="background-color:#28a745; color:#ffffff; padding:14px 28px; text-decoration:none; font-weight:bold; font-size:16px; border-radius:6px; display:inline-block;">👉 অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></p>'
+
             prompt_affiliate = f"""
             Write a high-converting Bengali affiliate product review for: '{product}'.
-            Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>. 
-            Add a green button at the bottom using this exact URL: '{affiliate_url}'.
-            Button HTML: '<div style="text-align:center; margin-top:20px;"><a href="{affiliate_url}" target="_blank" rel="sponsored" style="background-color:#28a745; color:white; padding:12px 25px; text-decoration:none; font-weight:bold; border-radius:5px;">অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></div>'
-            STRICTLY return JSON: {{"title": "Title in Bengali", "content": "HTML content"}}
+            Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>.
+            At the VERY END of the content, MUST append this EXACT HTML string as-is without changing any quotation marks or link:
+            {button_html}
+
+            STRICTLY return JSON format:
+            {{"title": "Title in Bengali", "content": "Full HTML content including the appended button"}}
             """
             print(f"Generating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
+            
+            # নিশ্চিত করা যেন বাটনটি কনটেন্টের শেষে সঠিকভাবে যুক্ত থাকে
+            if affiliate_url not in affiliate_data.get("content", ""):
+                affiliate_data["content"] += f"\n{button_html}"
+
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
         except Exception as e:
             print(f"❌ New blog error: {e}")
