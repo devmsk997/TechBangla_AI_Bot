@@ -31,7 +31,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_USERNAME: ${{ github.repository_owner }}
       GITHUB_REPO: ${{ github.event.repository.name }}
-      GEMINI_MODEL: gemini-2.5-flash-lite
+      GEMINI_MODEL: gemini-3.5-flash-lite
 
     steps:
       # ==========================================
@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install Pillow google-genai google-api-python-client google-auth requests
+          pip install Pillow google-genai google-api-python-client google-auth requests beautifulsoup4
 
       # ==========================================
       # 4. Build runtime config
@@ -85,7 +85,7 @@ jobs:
           import os
 
           GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-          GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+          GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
           BLOG_ID = os.environ.get("BLOG_ID", "")
           BLOG_ID_2 = os.environ.get("BLOG_ID_2", "")
           GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "")
@@ -128,8 +128,8 @@ jobs:
           for f in *.py; do
             [ -f "$f" ] || continue
             [ "$f" = "config.py" ] && continue
-            sed -i 's/gemini-2\.0-flash-lite/gemini-2.5-flash-lite/g' "$f"
-            sed -i 's/gemini-2\.0-flash/gemini-2.5-flash-lite/g' "$f"
+            sed -i 's/gemini-2\.0-flash-lite/gemini-3.5-flash-lite/g' "$f"
+            sed -i 's/gemini-2\.5-flash-lite/gemini-3.5-flash-lite/g' "$f"
           done
 
       # ==========================================
@@ -170,7 +170,7 @@ jobs:
 
           for f in posted_topics.json blog_posts.json; do
             if [ -f "/tmp/techbangla-state/$f" ]; then
-              cp "/tmp/tmp/techbangla-state/$f" "$f" 2>/dev/null || cp "/tmp/techbangla-state/$f" "$f"
+              cp "/tmp/techbangla-state/$f" "$f" 2>/dev/null || cp "/tmp/techbangla-state/$f" "$f"
               git add "$f"
             fi
           done
