@@ -3,24 +3,32 @@ import json
 import random
 import time
 from google import genai
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 # Environment Secrets
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
-GCP_SA_KEY = os.environ.get("GCP_SA_KEY")
+CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON")
+TOKEN_JSON = os.environ.get("TOKEN_JSON")
 
-# Gemini Client
+# Gemini Client Setup
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Blogger API Authenticate
-sa_info = json.loads(GCP_SA_KEY)
-credentials = service_account.Credentials.from_service_account_info(
-    sa_info,
-    scopes=['https://www.googleapis.com/auth/blogger']
-)
-blogger_service = build('blogger', 'v3', credentials=credentials)
+# Blogger OAuth2 Authentication Setup
+def get_blogger_service():
+    token_data = json.loads(TOKEN_JSON)
+    creds = Credentials.from_authorized_user_info(token_data)
+    
+    # Token Expired হলে Auto Refresh করার লজিক
+    if creds and creds.expired and creds.refresh_token:
+        client_data = json.loads(CREDENTIALS_JSON)
+        # Client info extracted from installed/web key
+        client_config = client_data.get("installed") or client_data.get("web")
+        creds.refresh(Request())
+        
+    return build('blogger', 'v3', credentials=creds)
 
 # ১০টি ক্যাটাগরি
 CATEGORIES = [
@@ -30,7 +38,6 @@ CATEGORIES = [
 ]
 
 def generate_post_with_retry(category):
-    """Google Server Overload (503) সামলাতে Auto-Retry ফাংশন"""
     prompt = f"""
     Write a complete SEO-friendly blog post in Bengali for the category: '{category}'.
     Return the response STRICTLY as a valid JSON object without markdown fences.
@@ -59,7 +66,7 @@ def generate_post_with_retry(category):
             else:
                 raise e
 
-def publish_to_blogger(post_data, category):
+def publish_to_blogger(blogger_service, post_data, category):
     body = {
         "kind": "blogger#post",
         "title": post_data["title"],
@@ -73,13 +80,20 @@ def publish_to_blogger(post_data, category):
 
 def main():
     print("🚀 TechBangla AI Bot Started")
+    
+    try:
+        blogger_service = get_blogger_service()
+    except Exception as e:
+        print(f"Failed to authenticate Blogger API: {e}")
+        return
+
     selected_categories = random.sample(CATEGORIES, 2)
     
     for category in selected_categories:
         try:
             print(f"\nCategory: {category}")
             post_data = generate_post_with_retry(category)
-            publish_to_blogger(post_data, category)
+            publish_to_blogger(blogger_service, post_data, category)
         except Exception as e:
             print(f"Failed to process category '{category}': {e}")
 
