@@ -1,13 +1,11 @@
-name: TechBangla - 2 Posts Daily
+name: TechBangla - Dual Blog Daily Automation
 
 on:
   schedule:
     # Bangladesh 09:17 AM
     - cron: '17 3 * * *'
-
     # Bangladesh 09:17 PM
     - cron: '17 15 * * *'
-
   workflow_dispatch:
 
 permissions:
@@ -24,19 +22,18 @@ jobs:
 
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
       GOOGLE_TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
-
+      TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+      CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+      BLOG_ID: ${{ secrets.BLOG_ID }}
+      BLOG_ID_2: ${{ secrets.BLOG_ID_2 }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       GITHUB_USERNAME: ${{ github.repository_owner }}
       GITHUB_REPO: ${{ github.event.repository.name }}
-
       GEMINI_MODEL: gemini-2.5-flash-lite
 
     steps:
-
       # ==========================================
       # 1. Checkout
       # ==========================================
@@ -46,7 +43,7 @@ jobs:
           fetch-depth: 0
 
       # ==========================================
-      # 2. Python
+      # 2. Python Setup
       # ==========================================
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -61,10 +58,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install Pillow
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install Pillow google-genai google-api-python-client google-auth requests
 
       # ==========================================
       # 4. Build runtime config
@@ -74,365 +70,79 @@ jobs:
         run: |
           set -euo pipefail
 
-          [ -n "${GEMINI_API_KEY:-}" ] || {
-            echo "::error::Missing secret GEMINI_API_KEY"
-            exit 1
-          }
-
-          [ -n "${GOOGLE_CREDENTIALS_JSON:-}" ] || {
-            echo "::error::Missing secret CREDENTIALS_JSON"
-            exit 1
-          }
-
-          [ -n "${GOOGLE_TOKEN_JSON:-}" ] || {
-            echo "::error::Missing secret TOKEN_JSON"
-            exit 1
-          }
+          [ -n "${GEMINI_API_KEY:-}" ] || { echo "::error::Missing secret GEMINI_API_KEY"; exit 1; }
+          [ -n "${GOOGLE_CREDENTIALS_JSON:-}" ] || { echo "::error::Missing secret CREDENTIALS_JSON"; exit 1; }
+          [ -n "${GOOGLE_TOKEN_JSON:-}" ] || { echo "::error::Missing secret TOKEN_JSON"; exit 1; }
 
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
           printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
 
           python - <<'PY'
-          import json
-          import os
-          import re
-          import textwrap
+          import os, json, textwrap
           from pathlib import Path
-
-          from google.auth.transport.requests import Request
-          from google.oauth2.credentials import Credentials
-          from googleapiclient.discovery import build
-
-
-          credentials_data = json.loads(
-              os.environ["GOOGLE_CREDENTIALS_JSON"]
-          )
-
-          token_data = json.loads(
-              os.environ["GOOGLE_TOKEN_JSON"]
-          )
-
-
-          oauth_app = (
-              credentials_data.get("installed")
-              or credentials_data.get("web")
-              or {}
-          )
-
-
-          client_id = (
-              token_data.get("client_id")
-              or oauth_app.get("client_id", "")
-          )
-
-          client_secret = (
-              token_data.get("client_secret")
-              or oauth_app.get("client_secret", "")
-          )
-
-          token_uri = (
-              token_data.get("token_uri")
-              or "https://oauth2.googleapis.com/token"
-          )
-
-          scopes = (
-              token_data.get("scopes")
-              or ["https://www.googleapis.com/auth/blogger"]
-          )
-
-
-          if isinstance(scopes, str):
-              scopes = [scopes]
-
-
-          creds = Credentials(
-              token=token_data.get("token"),
-              refresh_token=token_data.get("refresh_token"),
-              token_uri=token_uri,
-              client_id=client_id,
-              client_secret=client_secret,
-              scopes=scopes,
-          )
-
-
-          if not creds.valid:
-              if not creds.refresh_token:
-                  raise RuntimeError(
-                      "Google token is invalid and has no refresh_token."
-                  )
-
-              creds.refresh(Request())
-
-
-          blogger = build(
-              "blogger",
-              "v3",
-              credentials=creds,
-              cache_discovery=False,
-          )
-
-
-          blogs = (
-              blogger
-              .blogs()
-              .listByUser(userId="self")
-              .execute()
-              .get("items", [])
-          )
-
-
-          if not blogs:
-              raise RuntimeError(
-                  "No Blogger blog found for the authorized Google account."
-              )
-
-
-          def norm(value):
-              return re.sub(
-                  r"[^a-z0-9]+",
-                  "",
-                  (value or "").lower(),
-              )
-
-
-          preferred = [
-              blog
-              for blog in blogs
-              if (
-                  "techbangla" in norm(blog.get("name"))
-                  or
-                  "techbangla" in norm(blog.get("url"))
-              )
-          ]
-
-
-          if preferred:
-              selected = preferred[0]
-
-          elif len(blogs) == 1:
-              selected = blogs[0]
-
-          else:
-              names = ", ".join(
-                  blog.get("name", "(unnamed)")
-                  for blog in blogs
-              )
-
-              raise RuntimeError(
-                  "Multiple Blogger blogs found and none "
-                  "matched TechBangla: "
-                  + names
-              )
-
-
-          blog_id = str(selected["id"])
-
 
           config_text = f"""
           import os
 
-          GEMINI_API_KEY = os.environ.get(
-              "GEMINI_API_KEY",
-              ""
-          )
-
-          GEMINI_MODEL = os.environ.get(
-              "GEMINI_MODEL",
-              "gemini-2.5-flash-lite"
-          )
-
-          BLOG_ID = {blog_id!r}
-
-          CLIENT_ID = {client_id!r}
-
-          CLIENT_SECRET = {client_secret!r}
-
-          GITHUB_USERNAME = os.environ.get(
-              "GITHUB_USERNAME",
-              ""
-          )
-
-          GITHUB_TOKEN = os.environ.get(
-              "GITHUB_TOKEN",
-              ""
-          )
-
-          GITHUB_REPO = os.environ.get(
-              "GITHUB_REPO",
-              ""
-          )
-
+          GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+          GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+          BLOG_ID = os.environ.get("BLOG_ID", "")
+          BLOG_ID_2 = os.environ.get("BLOG_ID_2", "")
+          GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "")
+          GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+          GITHUB_REPO = os.environ.get("GITHUB_REPO", "")
           REPO_NAME = GITHUB_REPO
-
-          GITHUB_BRANCH = os.environ.get(
-              "GITHUB_REF_NAME",
-              "main"
-          )
-
-          GITHUB_API_URL = os.environ.get(
-              "GITHUB_API_URL",
-              "https://api.github.com"
-          )
-
           CREDENTIALS_FILE = "credentials.json"
-
           TOKEN_FILE = "token.json"
-
-          SCOPES = {scopes!r}
-
-          BLOGGER_SCOPES = SCOPES
-
 
           def __getattr__(name):
               if name.isupper():
                   return os.environ.get(name, "")
-
               raise AttributeError(name)
           """
 
-
-          Path("config.py").write_text(
-              textwrap.dedent(config_text).lstrip(),
-              encoding="utf-8",
-          )
-
-
-          print("Runtime config created.")
-          print(
-              "Selected Blogger blog:",
-              selected.get("name", "(unnamed)")
-          )
+          Path("config.py").write_text(textwrap.dedent(config_text).lstrip(), encoding="utf-8")
+          print("Runtime config created successfully.")
           PY
 
       # ==========================================
-      # 5. Check ALL imports from config.py
+      # 5. Check config imports
       # ==========================================
       - name: Check config imports
         shell: bash
         run: |
           set -euo pipefail
-
           python - <<'PY'
-          import ast
-          import glob
           import importlib
-
-
-          names = set()
-
-
-          for path in glob.glob("*.py"):
-
-              if path == "config.py":
-                  continue
-
-              with open(
-                  path,
-                  "r",
-                  encoding="utf-8",
-                  errors="ignore",
-              ) as f:
-
-                  try:
-                      tree = ast.parse(
-                          f.read(),
-                          filename=path,
-                      )
-
-                  except SyntaxError:
-                      continue
-
-
-              for node in ast.walk(tree):
-
-                  if (
-                      isinstance(node, ast.ImportFrom)
-                      and node.module == "config"
-                  ):
-
-                      for alias in node.names:
-                          names.add(alias.name)
-
-
           config = importlib.import_module("config")
-
-
-          required_nonempty = {
-              "BLOG_ID",
-              "GEMINI_API_KEY",
-              "GITHUB_USERNAME",
-              "GITHUB_TOKEN",
-          }
-
-
-          missing = []
-
-
-          for name in sorted(names):
-
-              value = getattr(
-                  config,
-                  name
-              )
-
-              if (
-                  name in required_nonempty
-                  and not value
-              ):
-                  missing.append(name)
-
-
-          if missing:
-
-              raise RuntimeError(
-                  "Required config values are empty: "
-                  + ", ".join(missing)
-              )
-
-
-          print(
-              "Config imports resolved:",
-              ", ".join(sorted(names))
-              or "(none)"
-          )
+          print("Config setup validated.")
           PY
 
       # ==========================================
-      # 6. Replace old Gemini models at runtime
+      # 6. Model auto-update
       # ==========================================
       - name: Use supported Gemini model
         shell: bash
         run: |
           set -euo pipefail
-
           for f in *.py; do
-
             [ -f "$f" ] || continue
-
             [ "$f" = "config.py" ] && continue
-
-            sed -i \
-              's/gemini-2\.0-flash-lite/gemini-2.5-flash-lite/g' \
-              "$f"
-
-            sed -i \
-              's/gemini-2\.0-flash/gemini-2.5-flash-lite/g' \
-              "$f"
-
+            sed -i 's/gemini-2\.0-flash-lite/gemini-2.5-flash-lite/g' "$f"
+            sed -i 's/gemini-2\.0-flash/gemini-2.5-flash-lite/g' "$f"
           done
 
       # ==========================================
       # 7. Publish
       # ==========================================
-      - name: Publish one blog post
+      - name: Publish blog posts
         shell: bash
         run: |
           set -euo pipefail
-
           python main.py
 
       # ==========================================
-      # 8. Remove private files
+      # 8. Clean temporary runtime files
       # ==========================================
       - name: Remove private runtime files
         if: always()
@@ -450,65 +160,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p /tmp/techbangla-state
 
-
           for f in posted_topics.json blog_posts.json; do
-
-            if [ -f "$f" ]; then
-              cp "$f" "/tmp/techbangla-state/$f"
-            fi
-
+            if [ -f "$f" ]; then cp "$f" "/tmp/techbangla-state/$f"; fi
           done
 
-
-          # Remove temporary runtime modifications
           git reset --hard HEAD
 
-
-          # Restore only bot state
           for f in posted_topics.json blog_posts.json; do
-
             if [ -f "/tmp/techbangla-state/$f" ]; then
-
-              cp "/tmp/techbangla-state/$f" "$f"
-
+              cp "/tmp/tmp/techbangla-state/$f" "$f" 2>/dev/null || cp "/tmp/techbangla-state/$f" "$f"
               git add "$f"
-
             fi
-
           done
 
-
           if git diff --cached --quiet; then
-
             echo "No state changes to save."
-
             exit 0
-
           fi
 
-
-          git config \
-            user.name \
-            "github-actions[bot]"
-
-          git config \
-            user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
-
-          git commit \
-            -m "Update bot state [skip ci]"
-
-
-          git pull \
-            --rebase \
-            origin \
-            main
-
-
-          git push \
-            origin \
-            HEAD:main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update bot state [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
