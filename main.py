@@ -63,7 +63,7 @@ def save_posted_history(history):
 
 def fetch_bdstall_details(product_name):
     """BDStall থেকে অটোমেটিক অ্যাফিলিয়েট লিংক এবং প্রোডাক্টের ছবি স্ক্র্যাপ করে"""
-    fallback_image = "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&q=80"
+    fallback_image = "https://picsum.photos/800/450?technology"
     
     try:
         search_query = urllib.parse.quote_plus(product_name)
@@ -134,13 +134,14 @@ def main():
     blogger_service = get_blogger_service()
     history = load_posted_history()
 
-    # ১. পুরনো ব্লগে পোস্ট (TechBangla)
+    # ১. পুরোনো ব্লগে পোস্ট (TechBangla)
     if BLOG_ID_OLD:
         try:
             category = random.choice(INFO_CATEGORIES)
             
-            # Unsplash থেকে তথ্যভিত্তিক পোস্টের জন্য ডিফল্ট ক্যাটাগরি ছবি
-            info_image_url = f"https://source.unsplash.com/800x450/?{urllib.parse.quote(category)},tech"
+            # টেকবাংলা ব্লগের জন্য সচল ইমেজ ইউআরএল
+            encoded_category = urllib.parse.quote(category)
+            info_image_url = f"https://picsum.photos/800/450?tech,{encoded_category}"
             info_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img border="0" src="{info_image_url}" alt="{category}" style="max-width:100%; height:auto;" /></div>\n\n'
 
             prompt_info = f"""
@@ -151,7 +152,7 @@ def main():
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
             
-            # কন্টেন্টের একদম শুরুতে ফিচার ছবি যুক্ত করা হলো
+            # কন্টেন্টের শুরুতে ফিচার ছবি যুক্ত করা
             info_data["content"] = info_image_html + info_data["content"]
             
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
@@ -173,7 +174,7 @@ def main():
             print(f"\nSearching affiliate details for: {product}")
             affiliate_url, image_url = fetch_bdstall_details(product)
             
-            # ১. একদম শুরুতে ফিচার ইমেজের HTML (যা থিম থাম্বনেইল বানাবে)
+            # ১. একদম শুরুতে ফিচার ইমেজের HTML
             feature_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;"><a href="{affiliate_url}" target="_blank" rel="sponsored"><img border="0" src="{image_url}" alt="{product}" style="max-width:100%; height:auto; border-radius:8px;" /></a></div>\n\n'
 
             # ২. শেষে বাই বাটনের HTML
