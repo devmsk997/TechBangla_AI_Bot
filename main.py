@@ -63,7 +63,7 @@ def save_posted_history(history):
 
 def fetch_bdstall_details(product_name):
     """BDStall থেকে অটোমেটিক অ্যাফিলিয়েট লিংক এবং প্রোডাক্টের ছবি স্ক্র্যাপ করে"""
-    fallback_image = "https://picsum.photos/800/450?technology"
+    fallback_image = "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&auto=format&fit=crop"
     
     try:
         search_query = urllib.parse.quote_plus(product_name)
@@ -139,9 +139,16 @@ def main():
         try:
             category = random.choice(INFO_CATEGORIES)
             
-            # টেকবাংলা ব্লগের জন্য সচল ইমেজ ইউআরএল
-            encoded_category = urllib.parse.quote(category)
-            info_image_url = f"https://picsum.photos/800/450?tech,{encoded_category}"
+            # স্থায়ী ফিক্সড ক্যাটাগরি ইমেজ ম্যাপিং (রিফ্রেশ করলেও পরিবর্তন হবে না)
+            category_images = {
+                "সাইবার নিরাপত্তা": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&auto=format&fit=crop",
+                "টেক রিভিউ": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&auto=format&fit=crop",
+                "পার্সোনাল ফাইন্যান্স": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&auto=format&fit=crop",
+                "ডিজিটাল মার্কেটিং": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop",
+                "আর্টিফিশিয়াল ইন্টেলিজেন্স": "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&auto=format&fit=crop"
+            }
+            
+            info_image_url = category_images.get(category, "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop")
             info_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img border="0" src="{info_image_url}" alt="{category}" style="max-width:100%; height:auto;" /></div>\n\n'
 
             prompt_info = f"""
@@ -152,7 +159,7 @@ def main():
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
             
-            # কন্টেন্টের শুরুতে ফিচার ছবি যুক্ত করা
+            # কন্টেন্টের শুরুতে স্থায়ী ফিচার ছবি যুক্ত করা
             info_data["content"] = info_image_html + info_data["content"]
             
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
