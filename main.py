@@ -18,6 +18,7 @@ CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON") or os.environ.get("GOOGLE_
 TOKEN_JSON = os.environ.get("TOKEN_JSON") or os.environ.get("GOOGLE_TOKEN_JSON")
 
 AFFILIATE_ID = "379372"
+HISTORY_FILE = "posted_history.json"
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -42,8 +43,28 @@ AFFILIATE_PRODUCTS = [
     "Trimmer"
 ]
 
-def fetch_bdstall_affiliate_link(product_name):
-    """BDStall এ প্রোডাক্ট সার্চ করে অটোমেটিক অ্যাফিলিয়েট লিংক তৈরি করে"""
+def load_posted_history():
+    """পূর্বে পোস্ট করা প্রোডাক্টের নাম লোড করে"""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_posted_history(history):
+    """নতুন পোস্ট হওয়া প্রোডাক্ট সেভ করে"""
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ History save error: {e}")
+
+def fetch_bdstall_details(product_name):
+    """BDStall থেকে অটোমেটিক অ্যাফিলিয়েট লিংক এবং প্রোডাক্টের ছবি স্ক্র্যাপ করে"""
+    fallback_image = "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&q=80"
+    
     try:
         search_query = urllib.parse.quote_plus(product_name)
         search_url = f"https://www.bdstall.com/search/?term={search_query}"
@@ -63,13 +84,23 @@ def fetch_bdstall_affiliate_link(product_name):
                     if not href.startswith('http'):
                         href = "https://www.bdstall.com" + href
                     final_affiliate_link = f"{href}?ref={AFFILIATE_ID}"
-                    print(f"🔗 Auto-found Affiliate Link: {final_affiliate_link}")
-                    return final_affiliate_link
+                    
+                    # ছবি স্ক্র্যাপ করা
+                    img_tag = a_tag.find('img')
+                    image_url = fallback_image
+                    if img_tag:
+                        image_url = img_tag.get('src') or img_tag.get('data-src') or fallback_image
+                        if image_url and not image_url.startswith('http'):
+                            image_url = "https://www.bdstall.com" + image_url
+                            
+                    print(f"🔗 Found Affiliate Link: {final_affiliate_link}")
+                    print(f"🖼️ Found Image URL: {image_url}")
+                    return final_affiliate_link, image_url
                     
     except Exception as e:
-        print(f"⚠️ Search link fetch failed: {e}")
+        print(f"⚠️ Search details fetch failed: {e}")
     
-    return f"https://www.bdstall.com/?ref={AFFILIATE_ID}"
+    return f"https://www.bdstall.com/?ref={AFFILIATE_ID}", fallback_image
 
 def generate_post(prompt):
     max_retries = 3
@@ -101,11 +132,17 @@ def publish_post(blogger_service, blog_id, post_data, label):
 def main():
     print("🚀 Dual-Blog AI Automation Bot Started")
     blogger_service = get_blogger_service()
+    history = load_posted_history()
 
     # ১. পুরনো ব্লগে পোস্ট (TechBangla)
     if BLOG_ID_OLD:
         try:
             category = random.choice(INFO_CATEGORIES)
+            
+            # Unsplash থেকে তথ্যভিত্তিক পোস্টের জন্য ডিফল্ট ক্যাটাগরি ছবি
+            info_image_url = f"https://source.unsplash.com/800x450/?{urllib.parse.quote(category)},tech"
+            info_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img border="0" src="{info_image_url}" alt="{category}" style="max-width:100%; height:auto;" /></div>\n\n'
+
             prompt_info = f"""
             Write an SEO-friendly blog post in Bengali for category: '{category}'.
             STRICTLY return JSON with keys "title" and "content".
@@ -113,6 +150,10 @@ def main():
             """
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
+            
+            # কন্টেন্টের একদম শুরুতে ফিচার ছবি যুক্ত করা হলো
+            info_data["content"] = info_image_html + info_data["content"]
+            
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
         except Exception as e:
             print(f"❌ Old blog error: {e}")
@@ -120,30 +161,44 @@ def main():
     # ২. নতুন অ্যাফিলিয়েট ব্লগে পোস্ট (BD Tech Shop Review)
     if BLOG_ID_NEW:
         try:
-            product = random.choice(AFFILIATE_PRODUCTS)
-            print(f"\nSearching affiliate link for: {product}")
-            affiliate_url = fetch_bdstall_affiliate_link(product)
+            # ডুপ্লিকেট এড়াতে না পোস্ট হওয়া প্রোডাক্ট ফিল্টার করা
+            available_products = [p for p in AFFILIATE_PRODUCTS if p not in history]
             
-            # নিখুঁত বাটনের HTML যা Gemini পরিবর্তন করবে না
+            # সব প্রোডাক্ট পোস্ট হয়ে গেলে লিস্ট রিসেট হবে
+            if not available_products:
+                available_products = AFFILIATE_PRODUCTS
+                history = []
+
+            product = random.choice(available_products)
+            print(f"\nSearching affiliate details for: {product}")
+            affiliate_url, image_url = fetch_bdstall_details(product)
+            
+            # ১. একদম শুরুতে ফিচার ইমেজের HTML (যা থিম থাম্বনেইল বানাবে)
+            feature_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;"><a href="{affiliate_url}" target="_blank" rel="sponsored"><img border="0" src="{image_url}" alt="{product}" style="max-width:100%; height:auto; border-radius:8px;" /></a></div>\n\n'
+
+            # ২. শেষে বাই বাটনের HTML
             button_html = f'<p style="text-align:center; margin-top:30px;"><a href="{affiliate_url}" target="_blank" rel="sponsored" style="background-color:#28a745; color:#ffffff; padding:14px 28px; text-decoration:none; font-weight:bold; font-size:16px; border-radius:6px; display:inline-block;">👉 অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></p>'
 
             prompt_affiliate = f"""
             Write a high-converting Bengali affiliate product review for: '{product}'.
             Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>.
-            At the VERY END of the content, MUST append this EXACT HTML string as-is without changing any quotation marks or link:
-            {button_html}
 
             STRICTLY return JSON format:
-            {{"title": "Title in Bengali", "content": "Full HTML content including the appended button"}}
+            {{"title": "Title in Bengali", "content": "Full HTML content"}}
             """
             print(f"Generating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
             
-            # নিশ্চিত করা যেন বাটনটি কনটেন্টের শেষে সঠিকভাবে যুক্ত থাকে
-            if affiliate_url not in affiliate_data.get("content", ""):
-                affiliate_data["content"] += f"\n{button_html}"
+            # ইমেজ ও বাটন কনটেন্টের সাথে সঠিকভাবে কম্বাইন করা হলো
+            final_content = feature_image_html + affiliate_data.get("content", "") + f"\n{button_html}"
+            affiliate_data["content"] = final_content
 
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
+            
+            # হিস্ট্রিতে সেভ করা
+            history.append(product)
+            save_posted_history(history)
+            
         except Exception as e:
             print(f"❌ New blog error: {e}")
     else:
