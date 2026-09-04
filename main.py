@@ -35,12 +35,12 @@ INFO_CATEGORIES = [
 ]
 
 AFFILIATE_PRODUCTS = [
-    "Solar PTZ Security Camera", 
     "Baseus Power Bank", 
-    "Wireless Earbuds", 
-    "Smart Watch",
-    "CC Camera",
-    "Trimmer"
+    "Wireless Earbuds Lenovo", 
+    "Smart Watch T800 Ultra",
+    "Trimmer Kemei",
+    "Dahua CC Camera",
+    "Solar PTZ Camera 4G"
 ]
 
 def load_posted_history():
