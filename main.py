@@ -35,7 +35,6 @@ INFO_CATEGORIES = [
     "ডিজিটাল মার্কেটিং", "আর্টিফিশিয়াল ইন্টেলিজেন্স"
 ]
 
-# ব্র্যান্ড ও মডেলসহ নির্দিষ্ট প্রোডাক্ট নাম (ডুপ্লিকেট রোখার জন্য)
 AFFILIATE_PRODUCTS = [
     "Baseus Power Bank", 
     "Wireless Earbuds Lenovo", 
@@ -56,7 +55,7 @@ def load_posted_history():
     return []
 
 def save_posted_history(history):
-    """নতুন পোস্ট হওয়া প্রোডাক্ট সেভ করে"""
+    """নতুন পোস্ট হওয়া প্রোডাক্ট সেভ করে"""
     try:
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(history, f, ensure_ascii=False, indent=2)
@@ -87,7 +86,6 @@ def fetch_bdstall_details(product_name):
                         href = "https://www.bdstall.com" + href
                     final_affiliate_link = f"{href}?ref={AFFILIATE_ID}"
                     
-                    # ছবি স্ক্র্যাপ করা
                     img_tag = a_tag.find('img')
                     image_url = fallback_image
                     if img_tag:
@@ -136,7 +134,6 @@ def main():
     blogger_service = get_blogger_service()
     history = load_posted_history()
     
-    # বর্তমান বছর অটোমেটিক বের করা
     current_year = datetime.now().year
 
     # ১. পুরোনো ব্লগে পোস্ট (TechBangla)
@@ -149,11 +146,12 @@ def main():
             info_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img border="0" src="{info_image_url}" alt="{category}" style="max-width:100%; height:auto;" /></div>\n\n'
 
             prompt_info = f"""
-            Write an SEO-friendly blog post in Bengali for category: '{category}'.
-            IMPORTANT: Do NOT write '2024' anywhere. If writing a year, use the current year: {current_year}.
-            If category is finance or marketing, connect it with digital tools/apps.
-            STRICTLY return JSON with keys "title" and "content".
-            The "content" must be valid HTML using <h2>, <p>, <ul> tags.
+            Write an SEO-friendly Bengali blog post about category: '{category}'.
+            RULES:
+            1. Do NOT write '2024' or any past year. If using year, use current year: {current_year}.
+            2. TITLE: Create a concise, clean title in Bengali (Max 50-60 chars) without special characters so Blogger generates a clean URL permalink.
+            3. FIRST PARAGRAPH: The very first paragraph must be a compelling 130-140 character summary in Bengali. This serves as the meta description.
+            4. FORMAT: Return JSON strictly with keys "title" and "content". "content" must be clean HTML using <p>, <h2>, <ul>, <li> tags.
             """
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
@@ -181,11 +179,12 @@ def main():
 
             prompt_affiliate = f"""
             Write a high-converting Bengali affiliate product review for: '{product}'.
-            IMPORTANT: Do NOT write '2024' in title or content. Use current year: {current_year}.
-            Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>.
-
-            STRICTLY return JSON format:
-            {{"title": "Title in Bengali", "content": "Full HTML content"}}
+            RULES:
+            1. Do NOT write '2024' or past years. Use current year: {current_year}.
+            2. TITLE: Keep the title clean, attractive, and focused (e.g. '{product} দাম বাংলাদেশে {current_year}') for good permalinks.
+            3. FIRST PARAGRAPH: Write an engaging 130-140 character summary right at the start.
+            4. Include <h2>কেন কিনবেন?</h2> and <h3>সুবিধা ও অসুবিধা</h3> in HTML.
+            5. Return JSON strictly: {{"title": "Title in Bengali", "content": "Full HTML content"}}
             """
             print(f"Generating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
