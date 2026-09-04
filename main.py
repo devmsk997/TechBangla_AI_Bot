@@ -4,6 +4,7 @@ import random
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from bs4 import BeautifulSoup
 from google import genai
 from google.oauth2.credentials import Credentials
@@ -30,10 +31,11 @@ def get_blogger_service():
     return build('blogger', 'v3', credentials=creds)
 
 INFO_CATEGORIES = [
-    "সাইবার নিরাপত্তা", "টেক রিভিউ", "পার্সোনাল ফাইন্যান্স", 
+    "সাইবার নিরাপত্তা", "টেক রিভিউ", "ডিজিটাল পার্সোনাল ফাইন্যান্স", 
     "ডিজিটাল মার্কেটিং", "আর্টিফিশিয়াল ইন্টেলিজেন্স"
 ]
 
+# ব্র্যান্ড ও মডেলসহ নির্দিষ্ট প্রোডাক্ট নাম (ডুপ্লিকেট রোখার জন্য)
 AFFILIATE_PRODUCTS = [
     "Baseus Power Bank", 
     "Wireless Earbuds Lenovo", 
@@ -133,28 +135,30 @@ def main():
     print("🚀 Dual-Blog AI Automation Bot Started")
     blogger_service = get_blogger_service()
     history = load_posted_history()
+    
+    # বর্তমান বছর অটোমেটিক বের করা
+    current_year = datetime.now().year
 
     # ১. পুরোনো ব্লগে পোস্ট (TechBangla)
     if BLOG_ID_OLD:
         try:
             category = random.choice(INFO_CATEGORIES)
             
-            # ১০০% গ্যারান্টিযুক্ত টেক পিকচার ইউআরএল (Picsum CDN)
             rand_id = random.randint(1, 500)
             info_image_url = f"https://picsum.photos/id/{rand_id}/800/450"
             info_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img border="0" src="{info_image_url}" alt="{category}" style="max-width:100%; height:auto;" /></div>\n\n'
 
             prompt_info = f"""
             Write an SEO-friendly blog post in Bengali for category: '{category}'.
+            IMPORTANT: Do NOT write '2024' anywhere. If writing a year, use the current year: {current_year}.
+            If category is finance or marketing, connect it with digital tools/apps.
             STRICTLY return JSON with keys "title" and "content".
             The "content" must be valid HTML using <h2>, <p>, <ul> tags.
             """
             print(f"\nGenerating post for OLD blog ({BLOG_ID_OLD}): {category}")
             info_data = generate_post(prompt_info)
             
-            # কন্টেন্টের শুরুতে ফিচার ছবি যুক্ত করা
             info_data["content"] = info_image_html + info_data["content"]
-            
             publish_post(blogger_service, BLOG_ID_OLD, info_data, category)
         except Exception as e:
             print(f"❌ Old blog error: {e}")
@@ -162,10 +166,8 @@ def main():
     # ২. নতুন অ্যাফিলিয়েট ব্লগে পোস্ট (BD Tech Shop Review)
     if BLOG_ID_NEW:
         try:
-            # ডুপ্লিকেট এড়াতে না পোস্ট হওয়া প্রোডাক্ট ফিল্টার করা
             available_products = [p for p in AFFILIATE_PRODUCTS if p not in history]
             
-            # সব প্রোডাক্ট পোস্ট হয়ে গেলে লিস্ট রিসেট হবে
             if not available_products:
                 available_products = AFFILIATE_PRODUCTS
                 history = []
@@ -174,14 +176,12 @@ def main():
             print(f"\nSearching affiliate details for: {product}")
             affiliate_url, image_url = fetch_bdstall_details(product)
             
-            # ১. একদম শুরুতে ফিচার ইমেজের HTML
             feature_image_html = f'<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;"><a href="{affiliate_url}" target="_blank" rel="sponsored"><img border="0" src="{image_url}" alt="{product}" style="max-width:100%; height:auto; border-radius:8px;" /></a></div>\n\n'
-
-            # ২. শেষে বাই বাটনের HTML
             button_html = f'<p style="text-align:center; margin-top:30px;"><a href="{affiliate_url}" target="_blank" rel="sponsored" style="background-color:#28a745; color:#ffffff; padding:14px 28px; text-decoration:none; font-weight:bold; font-size:16px; border-radius:6px; display:inline-block;">👉 অর্ডার করতে এখানে ক্লিক করুন (BDStall)</a></p>'
 
             prompt_affiliate = f"""
             Write a high-converting Bengali affiliate product review for: '{product}'.
+            IMPORTANT: Do NOT write '2024' in title or content. Use current year: {current_year}.
             Include <h2>কেন কিনবেন?</h2>, <h3>সুবিধা ও অসুবিধা</h3>.
 
             STRICTLY return JSON format:
@@ -190,13 +190,11 @@ def main():
             print(f"Generating review for NEW Affiliate blog ({BLOG_ID_NEW}): {product}")
             affiliate_data = generate_post(prompt_affiliate)
             
-            # ইমেজ ও বাটন কনটেন্টের সাথে সঠিকভাবে কম্বাইন করা হলো
             final_content = feature_image_html + affiliate_data.get("content", "") + f"\n{button_html}"
             affiliate_data["content"] = final_content
 
             publish_post(blogger_service, BLOG_ID_NEW, affiliate_data, "Affiliate")
             
-            # হিস্ট্রিতে সেভ করা
             history.append(product)
             save_posted_history(history)
             
