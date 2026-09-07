@@ -7,7 +7,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# SEO & Bot Modules Import (সঠিক নাম অনুযায়ী)
+# SEO & Bot Modules Import
 from topic_cluster import choose_topic
 from keyword_research import research_keywords
 from gemini_writer import generate_article
@@ -15,7 +15,6 @@ from seo_optimizer import optimize_seo
 from duplicate_checker import check_duplicate
 from internal_linker import add_internal_links
 from image_generator import generate_image
-from github_image import upload_image
 from quality_score import calculate_quality_score
 from blogger import create_json_ld, save_post
 
@@ -36,7 +35,7 @@ def get_blogger_service():
 def parse_gemini_output(generated_text):
     title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text)
     desc_match = re.search(r"SEARCH_DESCRIPTION:\s*(.*?)\n", generated_text)
-    labels_match = re.search(r"LABELS:\s*(.*?)\n", generated_text)
+    labels_match = re.search(r"LABELS:\_*(.*?)\n", generated_text)
     content_match = re.search(r"CONTENT:\s*(.*)", generated_text, re.DOTALL)
 
     title = title_match.group(1).strip() if title_match else "TechBangla Technology Guide"
@@ -51,54 +50,63 @@ def parse_gemini_output(generated_text):
 def main():
     print("🚀 TechBangla SEO Auto-Post Bot Started")
     
-    # 1. Topic & Category Selection
+    # ১. Topic & Category Selection
     topic, category = choose_topic()
     print(f"📌 Topic: {topic} | Category: {category}")
 
-    # 2. Keyword Research
+    # ২. Keyword Research
     keywords = research_keywords(category, topic)
     print(f"🔑 Keywords: {keywords}")
 
-    # 3. Article Generation using Gemini
+    # ৩. Article Generation using Gemini
     raw_article = generate_article(topic, category, keywords)
     title, search_description, labels, content = parse_gemini_output(raw_article)
 
-    # 4. Duplicate Check
+    # ৪. Duplicate Check
     dup_res = check_duplicate(title, content)
     if dup_res.get("duplicate"):
         print(f"⚠️ Duplicate detected ({dup_res.get('similarity')}% similarity). Skipping generation.")
         return
 
-    # 5. Quality & SEO Check
+    # ৫. Quality & SEO Check
     q_score = calculate_quality_score(title, content)
     print(f"📊 Quality Score: {q_score['score']}/100")
 
-    # 6. Internal Linking
+    # ৬. Internal Linking
     content = add_internal_links(content, category)
 
-    # 7. Image Generation & Upload
+    # ৭. Image Generation (ডিরেক্ট URL নিয়ে নেওয়া)
     try:
-        local_img = generate_image(title)
-        img_url = upload_image(local_img) if local_img else None
+        img_url = generate_image(title)
+        print(f"🖼️ Final Image URL for Blogger: {img_url}")
     except Exception as e:
-        print(f"Image generation skipped: {e}")
-        img_url = None
+        print(f"⚠️ Image generation skipped: {e}")
+        img_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280&auto=format&fit=crop"
 
-    # 8. SEO Optimization Payload
+    # ৮. SEO Optimization Payload
     seo_data = optimize_seo(title, content, category)
     if not search_description:
         search_description = seo_data["search_description"]
 
-    # 9. Format Content with Schema & Image
+    # ৯. Format Content with Schema & Blogger Featured Image
     try:
         schema = create_json_ld(title, search_description, img_url)
     except Exception:
         schema = ""
         
-    image_html = f'<div style="text-align:center;"><img src="{img_url}" alt="{title}" style="max-width:100%;height:auto;"/></div><br/>' if img_url else ""
+    image_html = ""
+    if img_url:
+        image_html = f'''
+<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;">
+    <a href="{img_url}" style="margin-left: 1em; margin-right: 1em;">
+        <img border="0" data-original-height="675" data-original-width="1200" src="{img_url}" alt="{title}" title="{title}" loading="eager" width="1200" height="675" style="max-width:100%; height:auto; border-radius:8px;" />
+    </a>
+</div>
+<br/>
+'''
     final_content = schema + image_html + content
 
-    # 10. Publish to Blogger
+    # ১০. Publish to Blogger
     blogger_service = get_blogger_service()
     body = {
         "kind": "blogger#post",
