@@ -24,6 +24,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+      BLOG_ID: ${{ secrets.BLOG_ID }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -59,6 +60,10 @@ jobs:
             echo "::error::Missing repository secret: GOOGLE_TOKEN_JSON"
             exit 1
           fi
+          if [ -z "${BLOG_ID:-}" ]; then
+            echo "::error::Missing repository secret: BLOG_ID"
+            exit 1
+          fi
 
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
           printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
@@ -67,15 +72,20 @@ jobs:
           import json
           import os
 
-          GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+          GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+          BLOG_ID = os.environ.get("BLOG_ID", "")
           GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+          GITHUB_USERNAME = "devmsk997"
+          GITHUB_REPO = "techbangla-image-hosting"
 
           try:
               _oauth = json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}"))
               _oauth = _oauth.get("installed") or _oauth.get("web") or {}
               CLIENT_SECRET = _oauth.get("client_secret", "")
+              CLIENT_ID = _oauth.get("client_id", "")
           except Exception:
               CLIENT_SECRET = ""
+              CLIENT_ID = ""
           PY
 
       - name: Use active free-tier Gemini model
