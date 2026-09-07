@@ -13,15 +13,11 @@ def load_posts():
     return []
 
 def save_post(title, url, category):
-    """
-    blogger.py থেকে কল হলে ব্লগ পোস্টটি blog_posts.json এ সেভ করবে।
-    """
     posts = load_posts()
 
     if not title or not url:
         return
 
-    # ডুप्लिकেট ইউআরএল এড়াতে
     for post in posts:
         if post.get("url") == url:
             return
@@ -35,10 +31,15 @@ def save_post(title, url, category):
     with open(POSTS_FILE, "w", encoding="utf-8") as file:
         json.dump(posts, file, ensure_ascii=False, indent=4)
 
-def get_related_posts(category, limit=5):
+def get_related_posts(category, limit=4):
+    """
+    একই ক্যাটাগরির পোস্ট এনে টপিক ক্লাস্টার তৈরি করে। 
+    কম থাকলে অন্য ক্যাটাগরির আসল পোস্ট ব্যাকআপ হিসেবে দেবে।
+    """
     posts = load_posts()
     valid_posts = [p for p in posts if p.get("title") and p.get("url")]
     
+    # একই ক্যাটাগরির সঠিক পোস্ট (Topic Cluster)
     related = [p for p in valid_posts if p.get("category") == category]
     
     if len(related) < limit:
@@ -47,45 +48,49 @@ def get_related_posts(category, limit=5):
         
     return related[:limit]
 
-def generate_blog_prompt(topic, category):
-    related_posts = get_related_posts(category, limit=6)
-    internal_links_context = json.dumps(related_posts, ensure_ascii=False)
+def create_internal_link_html(category):
+    """
+    পাইথন নিজে নিশ্চিতভাবে ১০০% সঠিক HTML লিংক তৈরি করবে, যা ৪-০-৪ হবে না।
+    """
+    related = get_related_posts(category, limit=4)
+    if not related:
+        return ""
 
+    html = "\n\n<h2>🔗 সম্পর্কিত আরও পোস্ট:</h2>\n<ul>\n"
+    for post in related:
+        html += f'  <li><a href="{post["url"]}" target="_blank">{post["title"]}</a></li>\n'
+    html += "</ul>\n"
+    
+    return html
+
+def generate_blog_prompt(topic, category):
     prompt = f"""
 You are an expert SEO Tech Blogger for TechBangla.
 Write a comprehensive, engaging, and fully SEO-optimized blog post in Bengali about: '{topic}'.
 Category: {category}
 
-STRICT FORMATTING & OUTPUT RULES:
-1. Do NOT use Markdown syntax (no **, ###, etc.). Use HTML tags exclusively (<h2>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>).
-2. Output Format MUST follow this template strictly:
+STRICT FORMATTING Rules:
+1. Do NOT use Markdown syntax (no **, ###). Use pure HTML tags (<h2>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>).
+2. Output template structure MUST be:
 
-TITLE: [SEO Friendly Title in Bengali]
+TITLE: [SEO Title in Bengali]
 
-SEARCH_DESCRIPTION: [150-160 characters summary in Bengali]
+SEARCH_DESCRIPTION: [Summary 150 chars]
 
 LABELS: {category}, সাইবার নিরাপত্তা, টেক নিউজ
 
 CONTENT:
-[Introductory paragraphs]
+[Introductory text]
 
-<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;">
-    <a href="FEATURED_IMAGE_URL" style="margin-left: 1em; margin-right: 1em;">
-        <img border="0" data-original-height="675" data-original-width="1200" src="FEATURED_IMAGE_URL" alt="{topic}" title="{topic}" loading="eager" width="1200" height="675" style="max-width:100%; height:auto; border-radius:8px;" />
-    </a>
-</div>
+<h2>[Header 1]</h2>
+[Details]
 
-📌 এটিও পড়ুন: <a href="EXACT_URL_FROM_JSON" target="_blank">EXACT_TITLE_FROM_JSON</a>
+<h2>[Header 2]</h2>
+[Details]
 
-<h2>[Section Header 1 in Bengali]</h2>
-[Detailed content]
+[MUST INCLUDE AT LEAST 3 DOFOLLOW EXTERNAL LINKS TO OFFICIAL SITES e.g. <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.microsoft.com" target="_blank">Microsoft Support</a>. DO NOT USE rel="nofollow"]
 
-<h2>[Section Header 2 in Bengali]</h2>
-[Detailed content]
-
-[MUST INCLUDE AT LEAST 3 HIGH AUTHORITY EXTERNAL DOFOLLOW LINKS (e.g. <a href="https://blog.google" target="_blank">Google Blog</a>). DO NOT USE rel="nofollow"]
-
-<h2>তুলনামূলক বিশ্লেষণ (Comparison Table)</h2>
+<h2>তুলনামূলক বিশ্লেষণ</h2>
 <table border="1" style="width:100%; border-collapse: collapse; text-align: left; margin: 15px 0;">
   <tr style="background-color: #f2f2f2;">
     <th style="padding: 8px;">বিষয়</th>
@@ -100,18 +105,6 @@ CONTENT:
 </table>
 
 <h2>উপসংহার</h2>
-[Conclusion paragraph]
-
-🔗 **সম্পর্কিত আরও পোস্ট:**
-<ul>
-  <li><a href="EXACT_URL_1" target="_blank">EXACT_TITLE_1</a></li>
-  <li><a href="EXACT_URL_2" target="_blank">EXACT_TITLE_2</a></li>
-  <li><a href="EXACT_URL_3" target="_blank">EXACT_TITLE_3</a></li>
-</ul>
-
-CRITICAL LINKING INSTRUCTIONS:
-- You MUST only use the exact URLs provided in this JSON list for internal links:
-{internal_links_context}
-- ALWAYS create proper HTML anchor tags (<a href="...">Title</a>) for both internal and external links. Never print raw text URLs without HTML.
+[Conclusion text]
 """
     return prompt
