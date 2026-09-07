@@ -12,39 +12,12 @@ def load_posts():
             return []
     return []
 
-def save_post(title, url, category):
-    posts = load_posts()
-
-    # টাইটেল বা ইউআরএল না থাকলে সেভ হবে না
-    if not title or not url:
-        return
-
-    # ডুप्लिकেট ইউআরএল এড়াতে
-    for post in posts:
-        if post.get("url") == url:
-            return
-
-    posts.append({
-        "title": title,
-        "url": url,
-        "category": category
-    })
-
-    with open(POSTS_FILE, "w", encoding="utf-8") as file:
-        json.dump(posts, file, ensure_ascii=False, indent=4)
-
 def get_related_posts(category, limit=5):
-    """
-    ক্যাটাগরি অনুযায়ী সম্পর্কিত পোস্ট আনবে, 
-    না পাওয়া গেলে অন্য ক্যাটাগরির লাইভ পোস্ট ব্যাকআপ হিসেবে দেবে।
-    """
     posts = load_posts()
     valid_posts = [p for p in posts if p.get("title") and p.get("url")]
     
-    # সমজাতীয় ক্যাটাগরির পোস্ট
     related = [p for p in valid_posts if p.get("category") == category]
     
-    # একই ক্যাটাগরিতে পোস্ট কম থাকলে অন্যান্য পোস্ট যুক্ত করবে
     if len(related) < limit:
         others = [p for p in valid_posts if p not in related]
         related.extend(others)
@@ -52,13 +25,7 @@ def get_related_posts(category, limit=5):
     return related[:limit]
 
 def generate_blog_prompt(topic, category):
-    """
-    AI-কে পারফেক্ট এইচটিএমএল, ৩টি External Link এবং 
-    json ফাইলের সঠিক ইউআরএল দিয়ে পোস্ট তৈরি করার প্রম্পট।
-    """
     related_posts = get_related_posts(category, limit=6)
-    
-    # AI-এর জন্য ব্যাকআপ হিসেবে সঠিক ইন্টারলিংক লিংক তৈরি
     internal_links_context = json.dumps(related_posts, ensure_ascii=False)
 
     prompt = f"""
@@ -68,7 +35,7 @@ Category: {category}
 
 STRICT FORMATTING & OUTPUT RULES:
 1. Do NOT use Markdown syntax (no **, ###, etc.). Use HTML tags exclusively (<h2>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>).
-2. Use the exact template structure below:
+2. Output Format MUST follow this template strictly:
 
 TITLE: [SEO Friendly Title in Bengali]
 
@@ -85,7 +52,7 @@ CONTENT:
     </a>
 </div>
 
-📌 এটিও পড়ুন: <a href="SELECT_ONE_EXACT_URL_FROM_JSON" target="_blank">SELECT_MATCHING_TITLE_FROM_JSON</a>
+📌 এটিও পড়ুন: <a href="EXACT_URL_FROM_JSON" target="_blank">EXACT_TITLE_FROM_JSON</a>
 
 <h2>[Section Header 1 in Bengali]</h2>
 [Detailed content]
@@ -93,7 +60,7 @@ CONTENT:
 <h2>[Section Header 2 in Bengali]</h2>
 [Detailed content]
 
-[MUST INCLUDE AT LEAST 3 HIGH AUTHORITY EXTERNAL LINKS WITH rel="nofollow" target="_blank" TO OFFICIAL SOURCES (e.g., Google Support, Microsoft, FIDO Alliance, Wikipedia, or official product documentation)]
+[MUST INCLUDE AT LEAST 3 HIGH AUTHORITY EXTERNAL DOFOLLOW LINKS (e.g. <a href="https://blog.google" target="_blank">Google Blog</a>). DO NOT USE rel="nofollow"]
 
 <h2>তুলনামূলক বিশ্লেষণ (Comparison Table)</h2>
 <table border="1" style="width:100%; border-collapse: collapse; text-align: left; margin: 15px 0;">
@@ -119,9 +86,9 @@ CONTENT:
   <li><a href="EXACT_URL_3" target="_blank">EXACT_TITLE_3</a></li>
 </ul>
 
-CRITICAL LINKING INSTRUCTION:
+CRITICAL LINKING INSTRUCTIONS:
 - You MUST only use the exact URLs provided in this JSON list for internal links:
 {internal_links_context}
-- NEVER invent or guess an internal URL. Incorrect URLs cause 404 errors.
+- ALWAYS create proper HTML anchor tags (<a href="...">Title</a>) for both internal and external links. Never print raw text URLs without HTML.
 """
     return prompt
