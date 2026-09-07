@@ -7,23 +7,23 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# SEO & Bot Modules Import
+# SEO & Bot Modules Import (সঠিক নাম অনুযায়ী)
 from topic_cluster import choose_topic
-from keyword_research_2 import research_keywords
-from gemini_writer_2 import generate_article
-from seo_optimizer_2 import optimize_seo
+from keyword_research import research_keywords
+from gemini_writer import generate_article
+from seo_optimizer import optimize_seo
 from duplicate_checker import check_duplicate
-from internal_linker_2 import add_internal_links
-from image_generator_2 import generate_image
-from github_image_2 import upload_image
+from internal_linker import add_internal_links
+from image_generator import generate_image
+from github_image import upload_image
 from quality_score import calculate_quality_score
-from blogger_2 import create_json_ld, save_post
+from blogger import create_json_ld, save_post
 
 # Environment Variables
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
-CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON")
-TOKEN_JSON = os.environ.get("TOKEN_JSON")
+CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON") or os.environ.get("CREDENTIALS_JSON")
+TOKEN_JSON = os.environ.get("GOOGLE_TOKEN_JSON") or os.environ.get("TOKEN_JSON")
 
 def get_blogger_service():
     token_data = json.loads(TOKEN_JSON)
@@ -65,8 +65,8 @@ def main():
 
     # 4. Duplicate Check
     dup_res = check_duplicate(title, content)
-    if dup_res["duplicate"]:
-        print(f"⚠️ Duplicate detected ({dup_res['similarity']}% similarity). Skipping generation.")
+    if dup_res.get("duplicate"):
+        print(f"⚠️ Duplicate detected ({dup_res.get('similarity')}% similarity). Skipping generation.")
         return
 
     # 5. Quality & SEO Check
@@ -77,8 +77,12 @@ def main():
     content = add_internal_links(content, category)
 
     # 7. Image Generation & Upload
-    local_img = generate_image(title)
-    img_url = upload_image(local_img) if local_img else None
+    try:
+        local_img = generate_image(title)
+        img_url = upload_image(local_img) if local_img else None
+    except Exception as e:
+        print(f"Image generation skipped: {e}")
+        img_url = None
 
     # 8. SEO Optimization Payload
     seo_data = optimize_seo(title, content, category)
@@ -86,7 +90,11 @@ def main():
         search_description = seo_data["search_description"]
 
     # 9. Format Content with Schema & Image
-    schema = create_json_ld(title, search_description, img_url)
+    try:
+        schema = create_json_ld(title, search_description, img_url)
+    except Exception:
+        schema = ""
+        
     image_html = f'<div style="text-align:center;"><img src="{img_url}" alt="{title}" style="max-width:100%;height:auto;"/></div><br/>' if img_url else ""
     final_content = schema + image_html + content
 
@@ -102,7 +110,11 @@ def main():
 
     res = blogger_service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
     print(f"✅ Successfully Published: {res.get('url')}")
-    save_post(title, res.get('url'), category)
+    
+    try:
+        save_post(title, res.get('url'), category)
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()
