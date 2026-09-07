@@ -8,30 +8,31 @@ def get_style(title):
     title_lower = title.lower()
 
     if any(word in title_lower for word in ["ransomware", "malware", "phishing", "security", "password", "vpn", "data breach", "cyber"]):
-        return "Cybersecurity theme, dark digital environment, encrypted data, security lock, network protection, hacker threat visualization, blue and red neon lighting, realistic 3D technology style"
+        return "Cybersecurity wallpaper, dark digital background, glowing glowing encrypted network, blue and red neon lighting, cinematic 3D tech style"
 
-    elif any(word in title_lower for word in ["ai", "artificial intelligence", "chatgpt", "machine learning"]):
-        return "Artificial intelligence theme, futuristic AI brain, neural network, digital hologram, advanced technology interface, blue futuristic lighting, realistic 3D render style"
+    elif any(word in title_lower for word in ["ai", "artificial intelligence", "chatgpt", "machine learning", "gemini"]):
+        return "Futuristic artificial intelligence background, glowing neural network, cyan holographic interface, hyperrealistic 3D render"
 
     elif any(word in title_lower for word in ["phone", "smartphone", "android", "mobile"]):
-        return "Modern smartphone technology, premium mobile device, digital interface, performance optimization concept, clean futuristic background, realistic product photography style"
+        return "High-end flagship smartphone concept, sleek glossy design, vibrant futuristic display, professional studio product lighting"
 
-    elif any(word in title_lower for word in ["app", "application"]):
-        return "Mobile application technology, modern app interface, smartphone screen, digital ecosystem, clean professional technology design, realistic 3D style"
+    elif any(word in title_lower for word in ["app", "application", "software"]):
+        return "Modern UI UX design concept, sleek glassmorphism app interface, floating digital screens, clean modern aesthetic"
 
     else:
-        return "Modern technology concept, digital world, future technology, computer interface, clean premium tech magazine style, realistic 3D render"
+        return "Ultra modern technology presentation, abstract digital network, clean minimal premium tech background, 8k resolution"
 
 
 def generate_image(title):
     style = get_style(title)
     
-    # Pollinations AI Prompt
-    prompt = f"Professional technology blog featured image. Topic: {title}. Style: {style}. Requirements: Premium technology magazine quality, realistic 3D render, high detail, 16:9 aspect ratio, no text, no logo."
+    # HD & High Quality Pollinations Prompt Injection
+    prompt = f"Unreal Engine 5 render, highly detailed, crisp focus, 8k resolution, cinematic lighting, 16:9 aspect ratio, professional blog cover photo of {title}, style of {style}, no text, no watermark, no logo, photorealistic"
     encoded_prompt = urllib.parse.quote(prompt)
     seed = random.randint(1000, 999999)
 
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&width=1280&height=720&nologo=true"
+    # Flux model enhancement + Enhance parameter for sharp quality
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&width=1280&height=720&model=flux&enhance=true&nologo=true"
     filename = "featured_image.jpg"
 
     try:
@@ -48,10 +49,9 @@ def generate_image(title):
                 return uploaded_url
 
         print("⚠️ Pollinations or upload failed, using dynamic Fallback URL.")
-        # ৩. কোনো কারণে এপিআই ফেল করলে নিরাপদ ডাইনামিক ইউআরএল রিটার্ন
         return url
 
     except Exception as e:
         print("⚠️ Image generation error:", e)
-        # ৪. এক্সেপশন হলে ব্যাকআপ আনস্প্ল্যাশ টেকনোলজি ছবি
+        # ৪. ব্যাকআপ টেকনোলজি ছবি (Unsplash HD)
         return "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280&auto=format&fit=crop"
