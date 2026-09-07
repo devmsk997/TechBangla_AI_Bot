@@ -1,261 +1,46 @@
+import os
 import requests
 import base64
-import os
-import time
 
-from config import (
-    GITHUB_TOKEN,
-    GITHUB_USERNAME,
-    GITHUB_REPO
-)
+GITHUB_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+GITHUB_REPO = "devmsk997/modern-kitchen-blog-images"
 
-
-
-def check_image_url(url):
-
-    try:
-
-        response = requests.get(
-            url,
-            timeout=15
-        )
-
-
-        if response.status_code == 200:
-
-            return True
-
-
-        return False
-
-
-
-    except Exception:
-
-        return False
-
-
-
-
-
-
-def upload_image(image_file):
-
-    if not image_file:
-
+def upload_image(image_path):
+    """
+    Uploads a local image file to GitHub repository and returns the CDN/raw URL.
+    If credentials or upload fails, it gracefully handles the exception.
+    """
+    if not image_path or not os.path.exists(image_path):
+        print("⚠️ Image path invalid or file does not exist.")
         return None
 
-
-
-    if not os.path.exists(image_file):
-
-        print(
-            "Image not found:",
-            image_file
-        )
-
+    if not GITHUB_TOKEN:
+        print("⚠️ GITHUB_TOKEN not found in environment. Skipping GitHub image upload.")
         return None
 
-
-
     try:
+        filename = os.path.basename(image_path)
+        with open(image_path, "rb") as file:
+            content = base64.b64encode(file.read()).decode("utf-8")
 
-
-        with open(
-            image_file,
-            "rb"
-        ) as file:
-
-
-            image_data = base64.b64encode(
-                file.read()
-            ).decode("utf-8")
-
-
-
-
-
-        filename = (
-
-            "images/featured_"
-
-            + str(int(time.time()))
-
-            + ".jpg"
-
-        )
-
-
-
-
-
-        api_url = (
-
-            f"https://api.github.com/repos/"
-
-            f"{GITHUB_USERNAME}/"
-
-            f"{GITHUB_REPO}/contents/"
-
-            f"{filename}"
-
-        )
-
-
-
-
-
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/images/{filename}"
         headers = {
-
-
-            "Authorization":
-
-            f"Bearer {GITHUB_TOKEN}",
-
-
-            "Accept":
-
-            "application/vnd.github+json",
-
-
-            "X-GitHub-Api-Version":
-
-            "2022-11-28"
-
-
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
         }
-
-
-
-
-
         data = {
-
-
-            "message":
-
-            "Upload featured image",
-
-
-            "content":
-
-            image_data
-
-
+            "message": f"Upload image {filename}",
+            "content": content
         }
 
-
-
-
-
-        response = requests.put(
-
-            api_url,
-
-            headers=headers,
-
-            json=data
-
-        )
-
-
-
-
-
-        if response.status_code not in [200,201]:
-
-
-            print(
-
-                "GitHub upload failed:",
-
-                response.text
-
-            )
-
-
-            return None
-
-
-
-
-
-        raw_url = (
-
-            f"https://raw.githubusercontent.com/"
-
-            f"{GITHUB_USERNAME}/"
-
-            f"{GITHUB_REPO}/main/"
-
-            f"{filename}"
-
-        )
-
-
-
-
-
-        print(
-
-            "Checking GitHub image..."
-
-        )
-
-
-
-
-
-        time.sleep(3)
-
-
-
-
-
-        if check_image_url(raw_url):
-
-
-            print(
-
-                "GitHub Image Verified:",
-
-                raw_url
-
-            )
-
-
+        response = requests.put(url, headers=headers, json=data)
+        if response.status_code in [200, 201]:
+            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/images/{filename}"
+            print(f"🖼️ Image uploaded successfully to GitHub: {raw_url}")
             return raw_url
-
-
-
-
-
         else:
-
-
-            print(
-
-                "GitHub image verification failed"
-
-            )
-
-
+            print(f"⚠️ Image upload failed: {response.json().get('message', 'Unknown error')}")
             return None
-
-
-
-
-
     except Exception as e:
-
-
-        print(
-
-            "GitHub image error:",
-
-            e
-
-        )
-
-
+        print(f"⚠️ Error during GitHub image upload: {e}")
         return None
