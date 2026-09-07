@@ -33,10 +33,10 @@ def get_blogger_service():
     return build('blogger', 'v3', credentials=creds)
 
 def parse_gemini_output(generated_text):
-    title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text)
-    desc_match = re.search(r"SEARCH_DESCRIPTION:\s*(.*?)\n", generated_text)
-    labels_match = re.search(r"LABELS:\_*(.*?)\n", generated_text)
-    content_match = re.search(r"CONTENT:\s*(.*)", generated_text, re.DOTALL)
+    title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text, re.IGNORECASE)
+    desc_match = re.search(r"SEARCH_DESCRIPTION:\s*(.*?)\n", generated_text, re.IGNORECASE)
+    labels_match = re.search(r"LABELS:\s*(.*?)\n", generated_text, re.IGNORECASE)
+    content_match = re.search(r"CONTENT:\s*(.*)", generated_text, re.DOTALL | re.IGNORECASE)
 
     title = title_match.group(1).strip() if title_match else "TechBangla Technology Guide"
     search_description = desc_match.group(1).strip() if desc_match else ""
@@ -72,10 +72,10 @@ def main():
     q_score = calculate_quality_score(title, content)
     print(f"📊 Quality Score: {q_score['score']}/100")
 
-    # ৬. Internal Linking
-    content = add_internal_links(content, category)
+    # ৬. Internal Linking (বর্তমান পোস্টের টাইটেল ফিল্টারিং সহ)
+    content = add_internal_links(content, category, current_title=title)
 
-    # ৭. Image Generation (ডিরেক্ট URL নিয়ে নেওয়া)
+    # ৭. Image Generation
     try:
         img_url = generate_image(title)
         print(f"🖼️ Final Image URL for Blogger: {img_url}")
@@ -86,7 +86,7 @@ def main():
     # ৮. SEO Optimization Payload
     seo_data = optimize_seo(title, content, category)
     if not search_description:
-        search_description = seo_data["search_description"]
+        search_description = seo_data.get("search_description", "")
 
     # ৯. Format Content with Schema & Blogger Featured Image
     try:
@@ -104,6 +104,7 @@ def main():
 </div>
 <br/>
 '''
+    # স্কিমা + এইচডি ইমেজ + ইন্টারলিঙ্ক সহ চূড়ান্ত কনটেন্ট
     final_content = schema + image_html + content
 
     # ১০. Publish to Blogger
@@ -117,12 +118,15 @@ def main():
     }
 
     res = blogger_service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
-    print(f"✅ Successfully Published: {res.get('url')}")
+    published_url = res.get('url')
+    print(f"✅ Successfully Published: {published_url}")
     
+    # ১১. Save Post to Local JSON for Future Topic Clustering
     try:
-        save_post(title, res.get('url'), category)
-    except Exception:
-        pass
+        save_post(title, published_url, category)
+        print("💾 Post saved to blog_posts.json for topic clustering.")
+    except Exception as e:
+        print(f"⚠️ Failed to save post to JSON: {e}")
 
 if __name__ == "__main__":
     main()
