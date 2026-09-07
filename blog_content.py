@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 
 POSTS_FILE = "blog_posts.json"
 
@@ -32,14 +33,10 @@ def save_post(title, url, category):
         json.dump(posts, file, ensure_ascii=False, indent=4)
 
 def get_related_posts(category, limit=4):
-    """
-    একই ক্যাটাগরির পোস্ট এনে টপিক ক্লাস্টার তৈরি করে। 
-    কম থাকলে অন্য ক্যাটাগরির আসল পোস্ট ব্যাকআপ হিসেবে দেবে।
-    """
     posts = load_posts()
     valid_posts = [p for p in posts if p.get("title") and p.get("url")]
     
-    # একই ক্যাটাগরির সঠিক পোস্ট (Topic Cluster)
+    # টপিক ক্লাস্টার: একই ক্যাটাগরির লাইভ পোস্ট
     related = [p for p in valid_posts if p.get("category") == category]
     
     if len(related) < limit:
@@ -50,7 +47,7 @@ def get_related_posts(category, limit=4):
 
 def create_internal_link_html(category):
     """
-    পাইথন নিজে নিশ্চিতভাবে ১০০% সঠিক HTML লিংক তৈরি করবে, যা ৪-০-৪ হবে না।
+    পাইথন নিজে নিশ্চিতভাবে 404-মুক্ত আসল ইন্টারলিংক তৈরি করবে
     """
     related = get_related_posts(category, limit=4)
     if not related:
@@ -64,31 +61,35 @@ def create_internal_link_html(category):
     return html
 
 def generate_blog_prompt(topic, category):
+    current_year = "2026"  # বর্তমান সাল ফিক্সড
+
     prompt = f"""
 You are an expert SEO Tech Blogger for TechBangla.
 Write a comprehensive, engaging, and fully SEO-optimized blog post in Bengali about: '{topic}'.
 Category: {category}
+CRITICAL TIME REQUIREMENT: Current Year is strictly {current_year}. Do NOT write 2024 or 2025 anywhere in titles or content. Always use {current_year}.
 
-STRICT FORMATTING Rules:
+STRICT FORMATTING RULES:
 1. Do NOT use Markdown syntax (no **, ###). Use pure HTML tags (<h2>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>).
-2. Output template structure MUST be:
+2. Do NOT write any internal links inside the content body yourself. (Internal links will be appended safely by Python to prevent 404 errors).
+3. Output template structure MUST be:
 
-TITLE: [SEO Title in Bengali]
+TITLE: [SEO Title in Bengali referencing {current_year}]
 
-SEARCH_DESCRIPTION: [Summary 150 chars]
+SEARCH_DESCRIPTION: [150 chars summary referencing {current_year}]
 
 LABELS: {category}, সাইবার নিরাপত্তা, টেক নিউজ
 
 CONTENT:
-[Introductory text]
+[Introductory text in Bengali]
 
-<h2>[Header 1]</h2>
+<h2>[Header 1 in Bengali]</h2>
 [Details]
 
-<h2>[Header 2]</h2>
+<h2>[Header 2 in Bengali]</h2>
 [Details]
 
-[MUST INCLUDE AT LEAST 3 DOFOLLOW EXTERNAL LINKS TO OFFICIAL SITES e.g. <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.microsoft.com" target="_blank">Microsoft Support</a>. DO NOT USE rel="nofollow"]
+[MUST INCLUDE AT LEAST 3 HIGH AUTHORITY EXTERNAL DOFOLLOW LINKS (e.g. <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). NEVER USE rel="nofollow"]
 
 <h2>তুলনামূলক বিশ্লেষণ</h2>
 <table border="1" style="width:100%; border-collapse: collapse; text-align: left; margin: 15px 0;">
