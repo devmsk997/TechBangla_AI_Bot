@@ -12,6 +12,29 @@ def load_posts():
             return []
     return []
 
+def save_post(title, url, category):
+    """
+    blogger.py থেকে কল হলে ব্লগ পোস্টটি blog_posts.json এ সেভ করবে।
+    """
+    posts = load_posts()
+
+    if not title or not url:
+        return
+
+    # ডুप्लिकেট ইউআরএল এড়াতে
+    for post in posts:
+        if post.get("url") == url:
+            return
+
+    posts.append({
+        "title": title,
+        "url": url,
+        "category": category
+    })
+
+    with open(POSTS_FILE, "w", encoding="utf-8") as file:
+        json.dump(posts, file, ensure_ascii=False, indent=4)
+
 def get_related_posts(category, limit=5):
     posts = load_posts()
     valid_posts = [p for p in posts if p.get("title") and p.get("url")]
