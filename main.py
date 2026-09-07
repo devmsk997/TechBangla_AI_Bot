@@ -1,482 +1,108 @@
+import os
+import json
+import time
 import re
+from google import genai
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-
+# SEO & Bot Modules Import
 from topic_cluster import choose_topic
-
-from keyword_research import research_keywords
-
-from gemini_writer import generate_article
-
-from seo_optimizer import optimize_seo
-
-from quality_score import calculate_quality_score
-
+from keyword_research_2 import research_keywords
+from gemini_writer_2 import generate_article
+from seo_optimizer_2 import optimize_seo
 from duplicate_checker import check_duplicate
-
-from image_generator import generate_image
-
-from image_quality import check_image_quality
-
-from github_image import upload_image
-
-from blogger import create_post
-
-from internal_linker import add_internal_links
-
-
-
-
-
-def parse_article(ai_text):
-
-
-    title = ""
-
-    search_description = ""
-
-    labels = []
-
-    content = ""
-
-
-
-    title_match = re.search(
-
-        r"TITLE:\s*(.*)",
-
-        ai_text
-
-    )
-
-
-    if title_match:
-
-        title = title_match.group(1).strip()
-
-
-
-
-
-    desc_match = re.search(
-
-        r"SEARCH_DESCRIPTION:\s*(.*)",
-
-        ai_text
-
-    )
-
-
-    if desc_match:
-
-        search_description = desc_match.group(1).strip()
-
-
-
-
-
-    label_match = re.search(
-
-        r"LABELS:\s*(.*)",
-
-        ai_text
-
-    )
-
-
-    if label_match:
-
-        labels = [
-
-            x.strip()
-
-            for x in label_match.group(1).split(",")
-
-        ]
-
-
-
-
-
-    content_match = re.search(
-
-        r"CONTENT:\s*(.*)",
-
-        ai_text,
-
-        re.DOTALL
-
-    )
-
-
-    if content_match:
-
-        content = content_match.group(1).strip()
-
-
-
-    return (
-
-        title,
-
-        search_description,
-
-        labels,
-
-        content
-
-    )
-
-
-
-
-
-
+from internal_linker_2 import add_internal_links
+from image_generator_2 import generate_image
+from github_image_2 import upload_image
+from quality_score import calculate_quality_score
+from blogger_2 import create_json_ld, save_post
+
+# Environment Variables
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+BLOG_ID = os.environ.get("BLOG_ID")
+CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON")
+TOKEN_JSON = os.environ.get("TOKEN_JSON")
+
+def get_blogger_service():
+    token_data = json.loads(TOKEN_JSON)
+    creds = Credentials.from_authorized_user_info(token_data)
+    if creds and creds.expired and creds.refresh_token:
+        client_data = json.loads(CREDENTIALS_JSON)
+        creds.refresh(Request())
+    return build('blogger', 'v3', credentials=creds)
+
+def parse_gemini_output(generated_text):
+    title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text)
+    desc_match = re.search(r"SEARCH_DESCRIPTION:\s*(.*?)\n", generated_text)
+    labels_match = re.search(r"LABELS:\s*(.*?)\n", generated_text)
+    content_match = re.search(r"CONTENT:\s*(.*)", generated_text, re.DOTALL)
+
+    title = title_match.group(1).strip() if title_match else "TechBangla Technology Guide"
+    search_description = desc_match.group(1).strip() if desc_match else ""
+    
+    labels_raw = labels_match.group(1).strip() if labels_match else ""
+    labels = [label.strip() for label in labels_raw.split(",") if label.strip()]
+    
+    content = content_match.group(1).strip() if content_match else generated_text
+    return title, search_description, labels, content
 
 def main():
-
-
-    print("🚀 TechBangla AI Bot Started")
-
-
-
-    # 1 Topic select
-
+    print("🚀 TechBangla SEO Auto-Post Bot Started")
+    
+    # 1. Topic & Category Selection
     topic, category = choose_topic()
-
-
-
-    print("Topic:", topic)
-
-    print("Category:", category)
-
-
-
-
-
-    # 2 Keyword research
-
-    keywords = research_keywords(
-
-        category,
-
-        topic
-
-    )
-
-
-
-    print(
-
-        "Keywords:",
-
-        keywords
-
-    )
-
-
-
-
-
-
-    # 3 Generate article
-
-    ai_article = generate_article(
-
-        topic,
-
-        category,
-
-        keywords
-
-    )
-
-
-
-
-
-    print(
-
-        "Article generated successfully"
-
-    )
-
-
-
-
-
-
-    # 4 Parse article
-
-    title, search_description, labels, content = parse_article(
-
-        ai_article
-
-    )
-
-
-
-
-
-    if not title:
-
-        title = topic
-
-
-
-
-
-    print(
-
-        "Title:",
-
-        title
-
-    )
-
-
-
-
-
-
-    # 5 Internal linking
-
-
-    content = add_internal_links(
-
-        content,
-
-        category
-
-    )
-
-
-
-
-
-    # 6 SEO
-
-    seo = optimize_seo(
-
-        title,
-
-        content,
-
-        category
-
-    )
-
-
-
-
-
+    print(f"📌 Topic: {topic} | Category: {category}")
+
+    # 2. Keyword Research
+    keywords = research_keywords(category, topic)
+    print(f"🔑 Keywords: {keywords}")
+
+    # 3. Article Generation using Gemini
+    raw_article = generate_article(topic, category, keywords)
+    title, search_description, labels, content = parse_gemini_output(raw_article)
+
+    # 4. Duplicate Check
+    dup_res = check_duplicate(title, content)
+    if dup_res["duplicate"]:
+        print(f"⚠️ Duplicate detected ({dup_res['similarity']}% similarity). Skipping generation.")
+        return
+
+    # 5. Quality & SEO Check
+    q_score = calculate_quality_score(title, content)
+    print(f"📊 Quality Score: {q_score['score']}/100")
+
+    # 6. Internal Linking
+    content = add_internal_links(content, category)
+
+    # 7. Image Generation & Upload
+    local_img = generate_image(title)
+    img_url = upload_image(local_img) if local_img else None
+
+    # 8. SEO Optimization Payload
+    seo_data = optimize_seo(title, content, category)
     if not search_description:
-
-
-        search_description = seo[
-
-            "search_description"
-
-        ]
-
-
-
-
-
-
-
-    # 7 Quality check
-
-
-    quality = calculate_quality_score(
-
-        title,
-
-        content
-
-    )
-
-
-
-    print(
-
-        "Quality Score:",
-
-        quality["score"]
-
-    )
-
-
-
-
-    if quality["score"] < 60:
-
-
-        print(
-
-            "Quality too low. Cancelled."
-
-        )
-
-        return
-
-
-
-
-
-
-    # 8 Duplicate check
-
-
-    duplicate = check_duplicate(
-
-        title,
-
-        content
-
-    )
-
-
-
-    if duplicate["duplicate"]:
-
-
-        print(
-
-            "Duplicate article found."
-
-        )
-
-        return
-
-
-
-
-
-
-
-    # 9 Image generation
-
-
-    image_url = None
-
-
-
-    for attempt in range(3):
-
-
-        print(
-
-            f"Generating image attempt: {attempt+1}"
-
-        )
-
-
-        image_file = generate_image(
-
-            title
-
-        )
-
-
-
-        if not image_file:
-
-            continue
-
-
-
-
-        if check_image_quality(
-
-            image_file
-
-        ):
-
-
-            print(
-
-                "Image quality OK"
-
-            )
-
-
-            image_url = upload_image(
-
-                image_file
-
-            )
-
-
-            break
-
-
-
-
-        else:
-
-
-            print(
-
-                "Bad image. Regenerating..."
-
-            )
-
-
-
-
-
-
-
-
-    if not image_url:
-
-
-        print(
-
-            "Image failed. Posting without image."
-
-        )
-
-
-
-
-
-
-
-    # 10 Blogger publish
-
-
-    create_post(
-
-        title,
-
-        content,
-
-        labels,
-
-        search_description,
-
-        image_url
-
-    )
-
-
-
-
-
-    print(
-
-        "✅ Bot Finished Successfully"
-
-    )
-
-
-
-
-
-
+        search_description = seo_data["search_description"]
+
+    # 9. Format Content with Schema & Image
+    schema = create_json_ld(title, search_description, img_url)
+    image_html = f'<div style="text-align:center;"><img src="{img_url}" alt="{title}" style="max-width:100%;height:auto;"/></div><br/>' if img_url else ""
+    final_content = schema + image_html + content
+
+    # 10. Publish to Blogger
+    blogger_service = get_blogger_service()
+    body = {
+        "kind": "blogger#post",
+        "title": title,
+        "content": final_content,
+        "labels": labels if labels else [category],
+        "searchDescription": search_description
+    }
+
+    res = blogger_service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
+    print(f"✅ Successfully Published: {res.get('url')}")
+    save_post(title, res.get('url'), category)
 
 if __name__ == "__main__":
-
-
     main()
