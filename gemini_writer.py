@@ -5,13 +5,12 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 def generate_article(topic, category, keywords):
     """
-    Gemini 2.5 Flash ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন।
-    main.py ফাইলের সাথে সামঞ্জস্য রেখে ফাংশনের নাম ও আর্গুমেন্ট ঠিক করা হয়েছে।
+    Gemini 3.6 Flash ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন।
     """
     client = genai.Client(api_key=GEMINI_API_KEY)
     
     keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
-    current_year = "2026"  # ২০২৬ সাল নিশ্চিত করতে
+    current_year = "2026"
 
     prompt = f"""
 You are an expert SEO Tech Blogger for TechBangla.
@@ -62,7 +61,7 @@ CONTENT:
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt,
         )
         return response.text
