@@ -1,19 +1,27 @@
-import google.generativeai as genai
+import os
+from google import genai
 
-def generate_blog_content(topic, category, gemini_api_key):
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+def generate_article(topic, category, keywords):
+    """
+    Gemini 2.5 Flash ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন।
+    main.py ফাইলের সাথে সামঞ্জস্য রেখে ফাংশনের নাম ও আর্গুমেন্ট ঠিক করা হয়েছে।
+    """
+    client = genai.Client(api_key=GEMINI_API_KEY)
     
-    current_year = "2026"  # ফিক্সড ২০২৬ সাল
+    keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
+    current_year = "2026"  # ২০২৬ সাল নিশ্চিত করতে
 
     prompt = f"""
 You are an expert SEO Tech Blogger for TechBangla.
 Write a comprehensive, engaging, and fully SEO-optimized blog post in Bengali about: '{topic}'.
 Category: {category}
+Target Keywords: {keywords_str}
 
 STRICT REQUIREMENTS:
 1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
-2. Output ONLY clean HTML tags (<h2>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
+2. Output ONLY clean HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
 3. Do NOT add any internal links inside the content. (Internal links will be appended safely by Python).
 4. MUST include at least 3 high-authority external DOFOLLOW links (e.g., <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). Do NOT use rel="nofollow".
 
@@ -51,5 +59,13 @@ CONTENT:
 <h2>উপসংহার</h2>
 [Conclusion text in Bengali]
 """
-    response = model.generate_content(prompt)
-    return response.text
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        return response.text
+    except Exception as e:
+        print(f"Error generating content via Gemini: {e}")
+        raise e
