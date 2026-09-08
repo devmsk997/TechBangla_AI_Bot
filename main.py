@@ -8,7 +8,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 # SEO & Bot Modules Import
-from topic_cluster import choose_topic
+from topic_cluster import choose_topic, save_topic
 from keyword_research import research_keywords
 from gemini_writer import generate_article
 from seo_optimizer import optimize_seo
@@ -87,6 +87,9 @@ def main():
     seo_data = optimize_seo(title, content, category)
     if not search_description:
         search_description = seo_data.get("search_description", "")
+        
+    # সার্চ ডেসক্রিপশন সর্বোচ্চ ১৫০ অক্ষরে সীমাবদ্ধ রাখা
+    search_description = search_description[:150]
 
     # ৯. Format Content with Schema & Blogger Featured Image
     try:
@@ -104,7 +107,6 @@ def main():
 </div>
 <br/>
 '''
-    # স্কিমা + এইচডি ইমেজ + ইন্টারলিঙ্ক সহ চূড়ান্ত কনটেন্ট
     final_content = schema + image_html + content
 
     # ১০. Publish to Blogger
@@ -121,12 +123,13 @@ def main():
     published_url = res.get('url')
     print(f"✅ Successfully Published: {published_url}")
     
-    # ১১. Save Post to Local JSON for Future Topic Clustering
+    # ১১. Save Post & Topic Data
     try:
         save_post(title, published_url, category)
-        print("💾 Post saved to blog_posts.json for topic clustering.")
+        save_topic(topic)  # সফল পোস্টের পর টপিকটি সেভ করা হচ্ছে
+        print("💾 Post and Topic history saved successfully.")
     except Exception as e:
-        print(f"⚠️ Failed to save post to JSON: {e}")
+        print(f"⚠️ Failed to save post history: {e}")
 
 if __name__ == "__main__":
     main()
