@@ -87,7 +87,7 @@ def main():
     # সার্চ ডেসক্রিপশন সর্বোচ্চ ১৫০ অক্ষরে সীমাবদ্ধ রাখা
     search_description = search_description[:150]
 
-    # ৮. Format Content with Schema & Blogger Featured Image
+    # ৮. Format Content with Schema & Responsive Blogger Featured Image
     try:
         schema = create_json_ld(title, search_description, img_url)
     except Exception:
@@ -97,8 +97,8 @@ def main():
     if img_url:
         image_html = f'''
 <div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;">
-    <a href="{img_url}" style="margin-left: 1em; margin-right: 1em;">
-        <img border="0" data-original-height="675" data-original-width="1200" src="{img_url}" alt="{title}" title="{title}" loading="eager" width="1200" height="675" style="max-width:100%; height:auto; border-radius:8px;" />
+    <a href="{img_url}" style="margin-left: auto; margin-right: auto; display: block;">
+        <img border="0" src="{img_url}" alt="{title}" title="{title}" loading="eager" style="max-width:100%; width:100%; height:auto; object-fit:cover; border-radius:8px;" />
     </a>
 </div>
 <br/>
