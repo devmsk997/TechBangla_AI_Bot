@@ -29,6 +29,15 @@ TOPIC_CLUSTERS = {
         "AI Code Assistants"
     ],
 
+    "গ্যাজেট রিভিউ": [
+        "Lenovo LP40 TWS Wireless Earbuds Review",
+        "Smart Watch T800 Ultra Features and Price",
+        "Kemei Electric Trimmer Complete Review",
+        "Baseus Fast Charging Power Bank Review",
+        "Solar PTZ 4G Security Camera Review",
+        "Dahua CC Camera Setup and Price in BD"
+    ],
+
     "মোবাইল টিপস": [
         "Android Optimization & Battery Saver",
         "Phone Performance Speedup",
@@ -97,7 +106,4 @@ def choose_topic():
     # র্যান্ডম একটি টপিক নির্বাচন
     selected_topic, selected_category = random.choice(available)
 
-    # নোট: এখান থেকে save_topic বাদ দেওয়া হয়েছে।
-    # পোস্টটি সফলভাবে পাবলিশ হওয়ার পর main.py থেকে এটি সেভ করাই নিরাপদ।
-    
     return selected_topic, selected_category
