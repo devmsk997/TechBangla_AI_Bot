@@ -13,7 +13,6 @@ from keyword_research import research_keywords
 from gemini_writer import generate_article
 from seo_optimizer import optimize_seo
 from duplicate_checker import check_duplicate
-from internal_linker import add_internal_links
 from image_generator import generate_image
 from quality_score import calculate_quality_score
 from blogger import create_json_ld, save_post
@@ -58,7 +57,7 @@ def main():
     keywords = research_keywords(category, topic)
     print(f"🔑 Keywords: {keywords}")
 
-    # ৩. Article Generation using Gemini
+    # ৩. Article Generation (gemini_writer স্বয়ংক্রিয়ভাবে blog_posts.json থেকে আসল লিংক যোগ করবে)
     raw_article = generate_article(topic, category, keywords)
     title, search_description, labels, content = parse_gemini_output(raw_article)
 
@@ -72,10 +71,7 @@ def main():
     q_score = calculate_quality_score(title, content)
     print(f"📊 Quality Score: {q_score['score']}/100")
 
-    # ৬. Internal Linking (বর্তমান পোস্টের টাইটেল ফিল্টারিং সহ)
-    content = add_internal_links(content, category, current_title=title)
-
-    # ৭. Image Generation
+    # ৬. Image Generation
     try:
         img_url = generate_image(title)
         print(f"🖼️ Final Image URL for Blogger: {img_url}")
@@ -83,7 +79,7 @@ def main():
         print(f"⚠️ Image generation skipped: {e}")
         img_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280&auto=format&fit=crop"
 
-    # ৮. SEO Optimization Payload
+    # ৭. SEO Optimization Payload
     seo_data = optimize_seo(title, content, category)
     if not search_description:
         search_description = seo_data.get("search_description", "")
@@ -91,7 +87,7 @@ def main():
     # সার্চ ডেসক্রিপশন সর্বোচ্চ ১৫০ অক্ষরে সীমাবদ্ধ রাখা
     search_description = search_description[:150]
 
-    # ৯. Format Content with Schema & Blogger Featured Image
+    # ৮. Format Content with Schema & Blogger Featured Image
     try:
         schema = create_json_ld(title, search_description, img_url)
     except Exception:
@@ -109,7 +105,7 @@ def main():
 '''
     final_content = schema + image_html + content
 
-    # ১০. Publish to Blogger
+    # ৯. Publish to Blogger
     blogger_service = get_blogger_service()
     body = {
         "kind": "blogger#post",
@@ -123,10 +119,10 @@ def main():
     published_url = res.get('url')
     print(f"✅ Successfully Published: {published_url}")
     
-    # ১১. Save Post & Topic Data
+    # ১০. Save Post & Topic Data (Blogger থেকে পাওয়া আসল URL সেভ করা হচ্ছে)
     try:
         save_post(title, published_url, category)
-        save_topic(topic)  # সফল পোস্টের পর টপিকটি সেভ করা হচ্ছে
+        save_topic(topic)
         print("💾 Post and Topic history saved successfully.")
     except Exception as e:
         print(f"⚠️ Failed to save post history: {e}")
