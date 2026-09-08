@@ -1,7 +1,34 @@
 import os
+import json
 from google import genai
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+def get_recent_internal_links():
+    """
+    blog_posts.json থেকে আসল ৩টি পোস্টের অরিজিনাল লিংক নিয়ে HTML লিস্ট তৈরি করে।
+    """
+    try:
+        if os.path.exists('blog_posts.json'):
+            with open('blog_posts.json', 'r', encoding='utf-8') as f:
+                posts = json.load(f)
+            
+            # শুধুমাত্র বৈধ URL আছে এমন সাম্প্রতিক ৩টি পোস্ট নেওয়া
+            valid_posts = [p for p in posts if isinstance(p, dict) and p.get('url')]
+            recent_posts = valid_posts[-3:]
+            
+            if recent_posts:
+                html = '<div style="margin-top: 25px; padding: 15px; background-color: #f9f9f9; border-left: 4px solid #007bff;">'
+                html += '<h3>🔗 সম্পর্কিত আরও পোস্ট:</h3><ul>'
+                for post in recent_posts:
+                    title = post.get('title', 'অন্যান্য ব্লগ পোস্ট')
+                    url = post.get('url')
+                    html += f'<li><a href="{url}" target="_blank">{title}</a></li>'
+                html += '</ul></div>'
+                return html
+    except Exception as e:
+        print(f"Internal links format error: {e}")
+    return ""
 
 def generate_article(topic, category, keywords):
     """
@@ -21,7 +48,7 @@ Target Keywords: {keywords_str}
 STRICT REQUIREMENTS:
 1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
 2. Output ONLY clean HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
-3. Do NOT add any internal links inside the content. (Internal links will be appended safely by Python).
+3. Do NOT invent or hardcode any internal links inside the content.
 4. MUST include at least 3 high-authority external DOFOLLOW links (e.g., <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). Do NOT use rel="nofollow".
 
 Output Format MUST be exactly:
@@ -57,6 +84,8 @@ CONTENT:
 
 <h2>উপসংহার</h2>
 [Conclusion text in Bengali]
+
+<!--INTERNAL_LINKS-->
 """
 
     try:
@@ -64,7 +93,18 @@ CONTENT:
             model='gemini-3.6-flash',
             contents=prompt,
         )
-        return response.text
+        
+        raw_article = response.text
+        
+        # আসল ব্লগ পোস্টের লিঙ্কগুলো সেফলি ইন্টারনাল লিঙ্ক হিসেবে অ্যাপেন্ড করা
+        internal_links_html = get_recent_internal_links()
+        if "<!--INTERNAL_LINKS-->" in raw_article:
+            raw_article = raw_article.replace("<!--INTERNAL_LINKS-->", internal_links_html)
+        else:
+            raw_article += f"\n\n{internal_links_html}"
+            
+        return raw_article
+
     except Exception as e:
         print(f"Error generating content via Gemini: {e}")
         raise e
