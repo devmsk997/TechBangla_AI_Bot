@@ -93,10 +93,10 @@ jobs:
         run: |
           for f in *.py; do
             [ -f "$f" ] || continue
-            sed -i 's/gemini-1\.5-flash/gemini-2.5-flash/g' "$f"
-            sed -i 's/gemini-2\.0-flash-lite/gemini-2.5-flash/g' "$f"
-            sed -i 's/gemini-2\.0-flash/gemini-2.5-flash/g' "$f"
-            sed -i 's/gemini-3\.6-flash/gemini-2.5-flash/g' "$f"
+            sed -i 's/gemini-1\.5-flash/gemini-3.6-flash/g' "$f"
+            sed -i 's/gemini-2\.0-flash-lite/gemini-3.6-flash/g' "$f"
+            sed -i 's/gemini-2\.0-flash/gemini-3.6-flash/g' "$f"
+            sed -i 's/gemini-2\.5-flash/gemini-3.6-flash/g' "$f"
           done
 
       - name: Publish one blog post
