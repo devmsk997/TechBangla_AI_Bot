@@ -1,6 +1,8 @@
 import os
 import json
+import time
 from google import genai
+from google.genai import types
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -32,7 +34,7 @@ def get_recent_internal_links():
 
 def generate_article(topic, category, keywords):
     """
-    Gemini 3.6 Flash ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন।
+    Gemini API ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন (With Retry Mechanism)।
     """
     client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -88,23 +90,37 @@ CONTENT:
 <!--INTERNAL_LINKS-->
 """
 
-    try:
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=prompt,
-        )
-        
-        raw_article = response.text
-        
-        # আসল ব্লগ পোস্টের লিঙ্কগুলো সেফলি ইন্টারনাল লিঙ্ক হিসেবে অ্যাপেন্ড করা
-        internal_links_html = get_recent_internal_links()
-        if "<!--INTERNAL_LINKS-->" in raw_article:
-            raw_article = raw_article.replace("<!--INTERNAL_LINKS-->", internal_links_html)
-        else:
-            raw_article += f"\n\n{internal_links_html}"
-            
-        return raw_article
+    # Automatic Function Calling (AFC) সংক্রান্ত ওয়ার্নিং দূর করতে খালি কনফিগারেশন পাস করা
+    config = types.GenerateContentConfig(
+        tools=[]
+    )
 
-    except Exception as e:
-        print(f"Error generating content via Gemini: {e}")
-        raise e
+    models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash']
+
+    for model_name in models_to_try:
+        for attempt in range(3):
+            try:
+                print(f"🔄 Requesting Gemini ({model_name}) - Attempt {attempt + 1}...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=config
+                )
+                
+                raw_article = response.text
+                
+                # ইন্টারনাল লিঙ্ক যুক্ত করা
+                internal_links_html = get_recent_internal_links()
+                if "<!--INTERNAL_LINKS-->" in raw_article:
+                    raw_article = raw_article.replace("<!--INTERNAL_LINKS-->", internal_links_html)
+                else:
+                    raw_article += f"\n\n{internal_links_html}"
+                    
+                return raw_article
+
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
+                if attempt < 2:
+                    time.sleep(5)  # ৫ সেকেন্ড অপেক্ষা করে আবার চেষ্টা করবে
+
+    raise Exception("❌ All Gemini API attempts failed due to server capacity limits.")
