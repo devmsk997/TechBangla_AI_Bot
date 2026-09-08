@@ -2,10 +2,10 @@ name: TechBangla - 2 Posts Daily
 
 on:
   schedule:
-    - cron: '17 9 * * *'
-      timezone: 'Asia/Dhaka'
-    - cron: '17 21 * * *'
-      timezone: 'Asia/Dhaka'
+    # ঢাকা সময় সকাল ৯:১৭ (UTC 03:17)
+    - cron: '17 3 * * *'
+    # ঢাকা সময় রাত ৯:১৭ (UTC 15:17)
+    - cron: '17 15 * * *'
   workflow_dispatch:
 
 permissions:
@@ -88,13 +88,13 @@ jobs:
               CLIENT_ID = ""
           PY
 
-      - name: Use active free-tier Gemini model
+      - name: Ensure correct Gemini Model Name
         shell: bash
         run: |
           for f in *.py; do
             [ -f "$f" ] || continue
-            sed -i 's/gemini-2\.0-flash-lite/gemini-2.5-flash-lite/g' "$f"
-            sed -i 's/gemini-2\.0-flash/gemini-2.5-flash-lite/g' "$f"
+            sed -i 's/gemini-2\.0-flash-lite/gemini-2.5-flash/g' "$f"
+            sed -i 's/gemini-2\.0-flash/gemini-2.5-flash/g' "$f"
           done
 
       - name: Publish one blog post
