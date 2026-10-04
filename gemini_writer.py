@@ -95,7 +95,6 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # এখানে শুধুমাত্র সচল এবং কোটা পাওয়া মডেলগুলোর নাম রাখা হয়েছে
     models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
 
     for model_name in models_to_try:
