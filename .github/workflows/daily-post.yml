@@ -88,17 +88,6 @@ jobs:
               CLIENT_ID = ""
           PY
 
-      - name: Ensure correct Gemini Model Name
-        shell: bash
-        run: |
-          for f in *.py; do
-            [ -f "$f" ] || continue
-            sed -i 's/gemini-1\.5-flash/gemini-3.6-flash/g' "$f"
-            sed -i 's/gemini-2\.0-flash-lite/gemini-3.6-flash/g' "$f"
-            sed -i 's/gemini-2\.0-flash/gemini-3.6-flash/g' "$f"
-            sed -i 's/gemini-2\.5-flash/gemini-3.6-flash/g' "$f"
-          done
-
       - name: Publish one blog post
         run: python main.py
 
