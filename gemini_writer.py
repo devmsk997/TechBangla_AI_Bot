@@ -8,31 +8,30 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 def get_available_posts_for_linking():
     """
-    blog_posts.json থেকে সব পোস্টের টাইটেল ও লিংক রিটার্ন করে, 
-    যাতে এআই সেগুলোর মধ্যে থেকে প্রাসঙ্গিক অ্যাঙ্কর টেক্সট লিংক তৈরি করতে পারে।
+    blog_posts.json থেকে সাম্প্রতিক পোস্টগুলোর টাইটেল ও ইউআরএল সংগ্রহ করে,
+    যাতে এআই লেখার ভেতরে প্রাসঙ্গিক অ্যাঙ্কর টেক্সট লিংক তৈরি করতে পারে।
     """
     try:
         if os.path.exists('blog_posts.json'):
             with open('blog_posts.json', 'r', encoding='utf-8') as f:
                 posts = json.load(f)
             
-            # শুধুমাত্র বৈধ URL আছে এমন পোস্টগুলো ফিল্টার করা
             valid_posts = [p for p in posts if isinstance(p, dict) and p.get('url') and p.get('title')]
-            return valid_posts[-10:] # সাম্প্রতিক ১০টি পোস্ট পাঠাতে পারেন
+            return valid_posts[-10:] # সাম্প্রতিক ১০টি পোস্ট
     except Exception as e:
         print(f"Error loading posts for internal linking: {e}")
     return []
 
 def generate_article(topic, category, keywords):
     """
-    Gemini API ব্যবহার করে SEO ফ্রেন্ডলি বাংলা আর্টিকেল তৈরি করার ফাংশন (Contextual Internal Linking সহ)।
+    Gemini API ব্যবহার করে ৬০ অক্ষরের টাইটেল, ২০০০+ শব্দের আর্টিকেল এবং কন্টেকচুয়াল অ্যাঙ্কর টেক্সট লিংকিং সহ জেনারেট করার ফাংশন।
     """
     client = genai.Client(api_key=GEMINI_API_KEY)
     
     keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
     current_year = "2026"
 
-    # আগের পোস্টগুলোর লিস্ট সংগ্রহ করা
+    # blog_posts.json থেকে আগের পোস্টগুলোর লিস্ট নেওয়া
     existing_posts = get_available_posts_for_linking()
     linking_instructions = ""
     
@@ -55,7 +54,7 @@ STRICT REQUIREMENTS:
 1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
 2. TITLE LENGTH: The SEO Title in Bengali MUST be strictly within 60 characters (max 60 characters). Keep it concise and attractive.
 3. ARTICLE LENGTH: Write an extensive, deep-dive article containing at least 2000 words. Expand all sections thoroughly with detailed explanations, steps, and examples.
-4. CONTEXTUAL INTERNAL LINKING: Naturally weave at least 2 to 3 internal links from the "Available posts" list above into the body paragraphs using meaningful anchor texts in Bengali. Format as HTML: <a href="URL">Anchor Text</a>. Do NOT put them all at the end; integrate them smoothly into sentences.
+4. CONTEXTUAL INTERNAL LINKING: Naturally weave at least 2 to 3 internal links from the "Available posts" list above into the body paragraphs using meaningful anchor texts in Bengali. Format as HTML: <a href="URL">Anchor Text</a>. Do NOT put them in a footer box; integrate them smoothly into sentences.
 5. Output ONLY clean HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
 6. MUST include at least 3 high-authority external DOFOLLOW links (e.g., <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). Do NOT use rel="nofollow".
 
@@ -102,7 +101,7 @@ CONTENT:
         tools=[]
     )
 
-    models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash']
+    models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.6-flash']
 
     for model_name in models_to_try:
         for attempt in range(3):
@@ -120,6 +119,6 @@ CONTENT:
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
                 if attempt < 2:
-                    time.sleep(5)  # ৫ সেকেন্ড অপেক্ষা করে আবার চেষ্টা করবে
+                    time.sleep(10)
 
     raise Exception("❌ All Gemini API attempts failed due to server capacity limits.")
