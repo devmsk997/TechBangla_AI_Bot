@@ -95,8 +95,8 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # মডেলের তালিকা: gemini-3.6-flash প্রথমে থাকবে, কোটা শেষ হলে বা এরর খেলে সাথে সাথে gemini-2.5-flash বা অন্য মডেলে সুইচ করবে
-    models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+    # এখানে শুধুমাত্র সচল এবং কোটা পাওয়া মডেলগুলোর নাম রাখা হয়েছে
+    models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
 
     for model_name in models_to_try:
         try:
