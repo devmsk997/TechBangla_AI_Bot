@@ -9,6 +9,11 @@ def clean_html(raw_html):
 def optimize_seo(title, content, category):
     # ১. টাইটেল ও কন্টেন্ট ক্লিন করা
     clean_title = re.sub(r'\s+', ' ', title).strip()
+    
+    # টাইটেল ৬০ অক্ষরের বেশি হলে ৬০ অক্ষরের মধ্যে কাটছাট করা (শব্দ ভেঙে না গিয়ে সুন্দরভাবে রাখার জন্য চাইলে ট্রান্সেট করতে পারেন, এখানে সরাসরি ৬০ অক্ষরে লিমিট করা হলো)
+    if len(clean_title) > 60:
+        clean_title = clean_title[:60].strip()
+
     plain_content = clean_html(content)
 
     # ২. কন্টেন্টের প্রথম ১৫০-১৬০ অক্ষর থেকে ডাইনামিক সার্চ ডেসক্রিপশন তৈরি
@@ -20,7 +25,7 @@ def optimize_seo(title, content, category):
     # ৩. আসল বাংলা শব্দের সংখ্যা গণনা
     word_count = len(plain_content.split())
 
-    # ৪. ডাইনামিক প্রাইমারি ও সেকেন্ডারি কিওয়ার্ড
+    # ৪. ডাইনামিক প্রাইমারি ও সেকেন্ডারি কিওয়ার্ড
     primary_keyword = clean_title.lower()
     keywords = [
         clean_title,
@@ -30,7 +35,7 @@ def optimize_seo(title, content, category):
         "TechBangla"
     ]
 
-    # ৫. কেস-ইনসেনসিটিভ উপায়ে H2 এবং H3 ট্যাগ চেক
+    # ৫. কেস-ইনসেনসিটিভ উপায়ে H2 এবং H3 ট্যাগ চেক
     has_h2 = bool(re.search(r'<h2', content, re.IGNORECASE))
     has_h3 = bool(re.search(r'<h3', content, re.IGNORECASE))
 
