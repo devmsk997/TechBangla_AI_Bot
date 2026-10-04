@@ -2,7 +2,6 @@ import os
 import json
 import time
 from google import genai
-from google.genai import types
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -96,26 +95,23 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # সবার প্রথমে gemini-3.6-flash মডেল রাখা হয়েছে, এরপর অন্যগুলো ফলব্যাক হিসেবে থাকবে
+    # মডেলের তালিকা: gemini-3.6-flash প্রথমে থাকবে, কোটা শেষ হলে বা এরর খেলে সাথে সাথে gemini-2.5-flash বা অন্য মডেলে সুইচ করবে
     models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
 
     for model_name in models_to_try:
-        for attempt in range(3):
-            try:
-                print(f"🔄 Requesting Gemini ({model_name}) - Attempt {attempt + 1}...")
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-                
-                raw_article = response.text
-                return raw_article
+        try:
+            print(f"🔄 Requesting Gemini ({model_name})...")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            
+            raw_article = response.text
+            return raw_article
 
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
-                if attempt < 2:
-                    wait_time = (attempt + 1) * 10
-                    print(f"⏳ Waiting {wait_time} seconds before retrying...")
-                    time.sleep(wait_time)
+        except Exception as e:
+            print(f"⚠️ Model {model_name} failed due to: {e}")
+            print(f"🔄 Switching to next available model...")
+            continue
 
-    raise Exception("❌ All Gemini API attempts failed due to server capacity limits.")
+    raise Exception("❌ All Gemini API models failed due to quota limits or server capacity.")
