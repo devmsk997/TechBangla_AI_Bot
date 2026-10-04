@@ -95,6 +95,7 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
+    # কোটা বা সার্ভার লিমিট এড়াতে সরাসরি সচল মডেলগুলো ব্যবহার করা হচ্ছে
     models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
 
     for model_name in models_to_try:
