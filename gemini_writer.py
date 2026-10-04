@@ -8,14 +8,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 def get_recent_internal_links():
     """
-    blog_posts.json থেকে আসল ৩টি পোস্টের অরিজিনাল লিংক নিয়ে HTML লিস্ট তৈরি করে।
+    blog_posts.json থেকে আসল ৩টি পোস্টের অরিজিনাল লিংক নিয়ে HTML লিস্ট তৈরি করে।
     """
     try:
         if os.path.exists('blog_posts.json'):
             with open('blog_posts.json', 'r', encoding='utf-8') as f:
                 posts = json.load(f)
             
-            # শুধুমাত্র বৈধ URL আছে এমন সাম্প্রতিক ৩টি পোস্ট নেওয়া
+            # শুধুমাত্র বৈধ URL আছে এমন সাম্প্রতিক ৩টি পোস্ট নেওয়া
             valid_posts = [p for p in posts if isinstance(p, dict) and p.get('url')]
             recent_posts = valid_posts[-3:]
             
@@ -43,19 +43,21 @@ def generate_article(topic, category, keywords):
 
     prompt = f"""
 You are an expert SEO Tech Blogger for TechBangla.
-Write a comprehensive, engaging, and fully SEO-optimized blog post in Bengali about: '{topic}'.
+Write a comprehensive, engaging, highly detailed, and fully SEO-optimized long-form blog post in Bengali about: '{topic}'.
 Category: {category}
 Target Keywords: {keywords_str}
 
 STRICT REQUIREMENTS:
 1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
-2. Output ONLY clean HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
-3. Do NOT invent or hardcode any internal links inside the content.
-4. MUST include at least 3 high-authority external DOFOLLOW links (e.g., <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). Do NOT use rel="nofollow".
+2. TITLE LENGTH: The SEO Title in Bengali MUST be strictly within 60 characters (max 60 characters). Keep it concise and attractive.
+3. ARTICLE LENGTH: Write an extensive, deep-dive article containing at least 2000 words. Expand all sections thoroughly with detailed explanations, steps, and examples.
+4. Output ONLY clean HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <tr>, <td>, <br/>). Do NOT use Markdown (no **, ###).
+5. Do NOT invent or hardcode any internal links inside the content.
+6. MUST include at least 3 high-authority external DOFOLLOW links (e.g., <a href="https://blog.google" target="_blank">Google Blog</a>, <a href="https://support.apple.com" target="_blank">Apple Support</a>). Do NOT use rel="nofollow".
 
 Output Format MUST be exactly:
 
-TITLE: [SEO Title in Bengali referencing {current_year}]
+TITLE: [SEO Title in Bengali referencing {current_year} and strictly under 60 characters]
 
 SEARCH_DESCRIPTION: [150 characters summary in Bengali]
 
@@ -65,10 +67,13 @@ CONTENT:
 [Introductory text in Bengali]
 
 <h2>[Header 1 in Bengali]</h2>
-[Details]
+[Detailed content with multiple paragraphs and sub-sections]
 
 <h2>[Header 2 in Bengali]</h2>
-[Details]
+[Detailed content with multiple paragraphs and sub-sections]
+
+<h2>[Header 3 in Bengali]</h2>
+[Detailed content with multiple paragraphs and sub-sections]
 
 <h2>তুলনামূলক বিশ্লেষণ</h2>
 <table border="1" style="width:100%; border-collapse: collapse; text-align: left; margin: 15px 0;">
@@ -90,7 +95,7 @@ CONTENT:
 <!--INTERNAL_LINKS-->
 """
 
-    # Automatic Function Calling (AFC) সংক্রান্ত ওয়ার্নিং দূর করতে খালি কনফিগারেশন পাস করা
+    # Automatic Function Calling (AFC) সংক্রান্ত ওয়ার্নিং দূর করতে খালি কনফিগারেশন পাস করা
     config = types.GenerateContentConfig(
         tools=[]
     )
