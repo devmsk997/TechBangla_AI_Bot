@@ -96,12 +96,8 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # Automatic Function Calling (AFC) সংক্রান্ত ওয়ার্নিং দূর করতে খালি কনফিগারেশন পাস করা
-    config = types.GenerateContentConfig(
-        tools=[]
-    )
-
-    models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.6-flash']
+    # সবার প্রথমে gemini-3.6-flash মডেল রাখা হয়েছে, এরপর অন্যগুলো ফলব্যাক হিসেবে থাকবে
+    models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
 
     for model_name in models_to_try:
         for attempt in range(3):
@@ -109,8 +105,7 @@ CONTENT:
                 print(f"🔄 Requesting Gemini ({model_name}) - Attempt {attempt + 1}...")
                 response = client.models.generate_content(
                     model=model_name,
-                    contents=prompt,
-                    config=config
+                    contents=prompt
                 )
                 
                 raw_article = response.text
@@ -119,6 +114,8 @@ CONTENT:
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
                 if attempt < 2:
-                    time.sleep(10)
+                    wait_time = (attempt + 1) * 10
+                    print(f"⏳ Waiting {wait_time} seconds before retrying...")
+                    time.sleep(wait_time)
 
     raise Exception("❌ All Gemini API attempts failed due to server capacity limits.")
