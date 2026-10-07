@@ -21,6 +21,27 @@ def get_available_posts_for_linking():
         print(f"Error loading posts for internal linking: {e}")
     return []
 
+def get_live_gemini_models(client):
+    """
+    পার্মানেন্ট সমাধান: গুগল সার্ভার থেকে স্বয়ংক্রিয়ভাবে সচল মডেলগুলোর লিস্ট নিয়ে আসবে,
+    যাতে হাত দিয়ে মডেলের নাম বারবার পরিবর্তন করতে না হয়।
+    """
+    fallback_list = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    try:
+        models = []
+        for m in client.models.list():
+            name = m.name.replace("models/", "")
+            # যে মডেলগুলোতে কন্টেন্ট জেনারেট করার সুবিধা আছে এবং ফ্লাশ বা প্রো ক্যাটাগরির
+            if "flash" in name or "pro" in name:
+                models.append(name)
+        if models:
+            # ডুপ্লিকেট দূর করে সঠিক অর্ডারে রাখা
+            return list(dict.fromkeys(models + fallback_list))
+    except Exception as e:
+        print(f"⚠️ Could not fetch live models list automatically: {e}")
+    
+    return fallback_list
+
 def generate_article(topic, category, keywords):
     """
     Gemini API ব্যবহার করে ৬০ অক্ষরের টাইটেল, ২০০০+ শব্দের আর্টিকেল এবং কন্টেকচুয়াল অ্যাঙ্কর টেক্সট লিংকিং সহ জেনারেট করার ফাংশন।
@@ -74,7 +95,7 @@ CONTENT:
 <h2>[Header 2 in Bengali]</h2>
 [Detailed content with multiple paragraphs and sub-sections]
 
-<h2>[Header 3 in Bengali]</h2>
+<h2>[Header 3 in_Bengali]</h2>
 [Detailed content with multiple paragraphs and sub-sections]
 
 <h2>তুলনামূলক বিশ্লেষণ</h2>
@@ -95,13 +116,9 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # শক্তিশালী ফলব্যাক চেইন: একটি ব্যস্ত বা ডাউন থাকলে অটোমেটিক পরের মডেলে সুইচ করবে
-    models_to_try = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro'
-    ]
+    # পার্মানেন্ট সমাধান: ডায়নামিকভাবে সচল মডেলের লিস্ট বের করা
+    models_to_try = get_live_gemini_models(client)
+    print(f"🔍 Dynamic Models Chain: {models_to_try}")
 
     for model_name in models_to_try:
         try:
@@ -118,7 +135,7 @@ CONTENT:
         except Exception as e:
             print(f"⚠️ Model {model_name} failed due to: {e}")
             print(f"🔄 Automatically switching to the next available model...")
-            time.sleep(2) # সার্ভারের উপর চাপ কমাতে সামান্য বিরতি
+            time.sleep(2)
             continue
 
     raise Exception("❌ All Gemini API models failed due to quota limits, high demand, or server capacity.")
