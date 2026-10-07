@@ -95,8 +95,13 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # গুগল প্রদত্ত সঠিক এবং সচল লেটেস্ট মডেলগুলো এখানে আপডেট করা হলো
-    models_to_try = ['gemini-3.8-flash', 'gemini-1.5-pro']
+    # শক্তিশালী ফলব্যাক চেইন: একটি ব্যস্ত বা ডাউন থাকলে অটোমেটিক পরের মডেলে সুইচ করবে
+    models_to_try = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro'
+    ]
 
     for model_name in models_to_try:
         try:
@@ -107,11 +112,13 @@ CONTENT:
             )
             
             raw_article = response.text
+            print(f"✅ Successfully generated article using model: {model_name}")
             return raw_article
 
         except Exception as e:
             print(f"⚠️ Model {model_name} failed due to: {e}")
-            print(f"🔄 Switching to next available model...")
+            print(f"🔄 Automatically switching to the next available model...")
+            time.sleep(2) # সার্ভারের উপর চাপ কমাতে সামান্য বিরতি
             continue
 
-    raise Exception("❌ All Gemini API models failed due to quota limits or server capacity.")
+    raise Exception("❌ All Gemini API models failed due to quota limits, high demand, or server capacity.")
