@@ -95,29 +95,35 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # বর্তমানের সবচেয়ে স্থিতিশীল এবং লেটেস্ট মডেলগুলোর ফাস্ট ফলব্যাক লিস্ট
     models_to_try = [
         'gemini-3.8-flash',
-        'gemini-3.5-flash',
-        'gemini-flash'
+        'gemini-3.5-flash'
     ]
 
-    for model_name in models_to_try:
-        try:
-            print(f"🔄 Requesting Gemini ({model_name})...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt
-            )
-            
-            raw_article = response.text
-            print(f"✅ Successfully generated article using model: {model_name}")
-            return raw_article
+    # সার্ভার ব্যস্ত থাকলে কয়েকবার রিট্রাই করার লজিক
+    max_retries = 3
 
-        except Exception as e:
-            print(f"⚠️ Model {model_name} failed due to: {e}")
-            print(f"🔄 Automatically switching to the next available model...")
-            time.sleep(1)
-            continue
+    for model_name in models_to_try:
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 Requesting Gemini ({model_name}) - Attempt {attempt + 1}...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                
+                raw_article = response.text
+                print(f"✅ Successfully generated article using model: {model_name}")
+                return raw_article
+
+            except Exception as e:
+                print(f"⚠️ Model {model_name} failed on attempt {attempt + 1} due to: {e}")
+                if "503" in str(e) or "UNAVAILABLE" in str(e):
+                    print(f"⏳ Server is busy. Waiting 5 seconds before retrying...")
+                    time.sleep(5) # সার্ভারের চাপ কমতে ৫ সেকেন্ড সময় দেওয়া হচ্ছে
+                else:
+                    break # অন্য কোনো এরর হলে মডেল পরিবর্তন করে ফেলবে
+        
+        print(f"🔄 Switching to next available model...")
 
     raise Exception("❌ All Gemini API models failed due to quota limits, high demand, or server capacity.")
