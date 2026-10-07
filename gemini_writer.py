@@ -95,8 +95,8 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # কোটা বা সার্ভার লিমিট এড়াতে সরাসরি সচল মডেলগুলো ব্যবহার করা হচ্ছে
-    models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
+    # গুগল প্রদত্ত সঠিক এবং সচল লেটেস্ট মডেলগুলো এখানে আপডেট করা হলো
+    models_to_try = ['gemini-3.8-flash', 'gemini-1.5-pro']
 
     for model_name in models_to_try:
         try:
