@@ -95,18 +95,22 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
+    # সমস্ত ফ্রি ও এভেইলেবল ফ্লাশ মডেলগুলোর দীর্ঘ সিরিয়াল চেইন
     models_to_try = [
         'gemini-3.8-flash',
-        'gemini-3.5-flash'
+        'gemini-3.5-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest'
     ]
 
-    # সার্ভার ব্যস্ত থাকলে কয়েকবার রিট্রাই করার লজিক
-    max_retries = 3
+    max_retries = 2
 
     for model_name in models_to_try:
         for attempt in range(max_retries):
             try:
-                print(f"🔄 Requesting Gemini ({model_name}) - Attempt {attempt + 1}...")
+                print(f"🔄 Requesting Free Model ({model_name}) - Attempt {attempt + 1}...")
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt
@@ -120,10 +124,10 @@ CONTENT:
                 print(f"⚠️ Model {model_name} failed on attempt {attempt + 1} due to: {e}")
                 if "503" in str(e) or "UNAVAILABLE" in str(e):
                     print(f"⏳ Server is busy. Waiting 5 seconds before retrying...")
-                    time.sleep(5) # সার্ভারের চাপ কমতে ৫ সেকেন্ড সময় দেওয়া হচ্ছে
+                    time.sleep(5)
                 else:
-                    break # অন্য কোনো এরর হলে মডেল পরিবর্তন করে ফেলবে
+                    break # 404 বা অন্য এরর হলে সাথে সাথে সিরিয়ালের পরের মডেলে চলে যাবে
         
-        print(f"🔄 Switching to next available model...")
+        print(f"🔄 Moving to the next model in sequence...")
 
-    raise Exception("❌ All Gemini API models failed due to quota limits, high demand, or server capacity.")
+    raise Exception("❌ All Free Gemini API models failed sequentially due to high demand or capacity limits.")
