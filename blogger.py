@@ -57,6 +57,23 @@ def create_json_ld(title, description, image_url):
 def create_post(title, content, labels=None, search_description=None, image_url=None):
     service = get_service()
 
+    # লেবেল পরিষ্কার ও ফরম্যাট করার পাইথন লজিক
+    formatted_labels = None
+    if labels:
+        if isinstance(labels, str):
+            # কমা বা স্পেস দিয়ে ভাগ করে সব ট্যাগ আলাদা করা এবং খালি অংশ বাদ দেওয়া
+            tags = [t.strip() for t in labels.replace(',', ' ').split() if t.strip()]
+        elif isinstance(labels, list):
+            tags = [str(t).strip() for t in labels if str(t).strip()]
+        else:
+            tags = []
+        
+        if tags:
+            # ব্লগার API সাধারণত লিস্ট বা কমা-সেপারেটেড স্ট্রিং গ্রহণ করে। 
+            # এখানে ব্লগার API-এর চাহিদামতো লিস্ট আকারে বা ক্লিন স্ট্রিং হিসেবে দেওয়া যায়। 
+            # যেহেতু ব্লগার API-এ লেবেল লিস্ট বা স্ট্রিং হতে পারে, আমরা লিস্ট ফরম্যাট নিশ্চিত করলাম।
+            formatted_labels = tags
+
     schema = create_json_ld(title, search_description, image_url)
 
     # ব্লগার ফ্রেন্ডলি স্ট্যান্ডার্ড ফিচার্ড ইমেজ ট্যাগ
@@ -79,8 +96,8 @@ def create_post(title, content, labels=None, search_description=None, image_url=
         "content": final_content
     }
 
-    if labels:
-        post["labels"] = labels
+    if formatted_labels:
+        post["labels"] = formatted_labels
 
     if search_description:
         post["searchDescription"] = search_description
@@ -98,7 +115,7 @@ def create_post(title, content, labels=None, search_description=None, image_url=
     save_post(
         title,
         result.get("url", ""),
-        labels[0] if labels else "Technology"
+        formatted_labels[0] if formatted_labels else "Technology"
     )
 
     return result
