@@ -50,7 +50,7 @@ Target Keywords: {keywords_str}
 {linking_instructions}
 
 STRICT REQUIREMENTS:
-1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text
+1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
 2. TITLE LENGTH: The SEO Title in Bengali MUST be strictly within 60 characters (max 60 characters). Keep it concise and attractive.
 3. ARTICLE LENGTH: Write an extensive, deep-dive article containing at least 2000 words. Expand all sections thoroughly with detailed explanations, steps, and examples.
 4. CONTEXTUAL INTERNAL LINKING: Naturally weave at least 2 to 3 internal links from the "Available posts" list above into the body paragraphs using meaningful anchor texts in Bengali. Format as HTML: <a href="URL">Anchor Text</a>. Do NOT put them in a footer box; integrate them smoothly into sentences.
