@@ -41,7 +41,15 @@ def parse_gemini_output(generated_text):
     search_description = desc_match.group(1).strip() if desc_match else ""
     
     labels_raw = labels_match.group(1).strip() if labels_match else ""
-    labels = [label.strip() for label in labels_raw.split(",") if label.strip()]
+    # লেবেলগুলোকে নিখুঁতভাবে পার্স ও ক্লিন করার নতুন লজিক
+    labels = []
+    if labels_raw:
+        labels_raw = labels_raw.replace('[', '').replace(']', '').replace('"', '').replace("'", "")
+        raw_list = labels_raw.split(',')
+        for label in raw_list:
+            cleaned = label.strip()
+            if cleaned and cleaned not in labels:
+                labels.append(cleaned)
     
     content = content_match.group(1).strip() if content_match else generated_text
     return title, search_description, labels, content
@@ -57,7 +65,7 @@ def main():
     keywords = research_keywords(category, topic)
     print(f"🔑 Keywords: {keywords}")
 
-    # ৩. Article Generation (gemini_writer স্বয়ংক্রিয়ভাবে blog_posts.json থেকে আসল লিংক যোগ করবে)
+    # ৩. Article Generation (gemini_writer স্বয়ংক্রিয়ভাবে blog_posts.json থেকে আসল লিংক যোগ করবে)
     raw_article = generate_article(topic, category, keywords)
     title, search_description, labels, content = parse_gemini_output(raw_article)
 
@@ -119,7 +127,7 @@ def main():
     published_url = res.get('url')
     print(f"✅ Successfully Published: {published_url}")
     
-    # ১০. Save Post & Topic Data (Blogger থেকে পাওয়া আসল URL সেভ করা হচ্ছে)
+    # ১০. Save Post & Topic Data (Blogger থেকে পাওয়া আসল URL সেভ করা হচ্ছে)
     try:
         save_post(title, published_url, category)
         save_topic(topic)
