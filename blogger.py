@@ -57,22 +57,28 @@ def create_json_ld(title, description, image_url):
 def create_post(title, content, labels=None, search_description=None, image_url=None):
     service = get_service()
 
-    # লেবেল পরিষ্কার ও ফরম্যাট করার পাইথন লজিক
-    formatted_labels = None
+    # লেবেল নিখুঁতভাবে পার্স ও ক্লিন করার নতুন শক্তিশালী লজিক
+    formatted_labels = []
     if labels:
         if isinstance(labels, str):
-            # কমা বা স্পেস দিয়ে ভাগ করে সব ট্যাগ আলাদা করা এবং খালি অংশ বাদ দেওয়া
-            tags = [t.strip() for t in labels.replace(',', ' ').split() if t.strip()]
+            # যদি লেবেলগুলো কমা বা অন্য কোনো চিহ্নে জোড়া থাকে, তবে কমা ধরে আলাদা করব
+            raw_list = labels.split(',')
         elif isinstance(labels, list):
-            tags = [str(t).strip() for t in labels if str(t).strip()]
+            raw_list = []
+            for item in labels:
+                if isinstance(item, str):
+                    raw_list.extend(item.split(','))
+                else:
+                    raw_list.append(str(item))
         else:
-            tags = []
-        
-        if tags:
-            # ব্লগার API সাধারণত লিস্ট বা কমা-সেপারেটেড স্ট্রিং গ্রহণ করে। 
-            # এখানে ব্লগার API-এর চাহিদামতো লিস্ট আকারে বা ক্লিন স্ট্রিং হিসেবে দেওয়া যায়। 
-            # যেহেতু ব্লগার API-এ লেবেল লিস্ট বা স্ট্রিং হতে পারে, আমরা লিস্ট ফরম্যাট নিশ্চিত করলাম।
-            formatted_labels = tags
+            raw_list = [str(labels)]
+
+        for tag in raw_list:
+            cleaned = tag.strip()
+            # যদি ট্যাগের ভেতরে ভুলবশত কোনো কোটেশন বা অতিরিক্ত কমা থাকে তা মুছে ফেলা
+            cleaned = cleaned.replace('"', '').replace("'", "").strip(',')
+            if cleaned and cleaned not in formatted_labels:
+                formatted_labels.append(cleaned)
 
     schema = create_json_ld(title, search_description, image_url)
 
