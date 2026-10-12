@@ -15,7 +15,7 @@ from seo_optimizer import optimize_seo
 from duplicate_checker import check_duplicate
 from image_generator import generate_image
 from quality_score import calculate_quality_score
-from blogger import create_json_ld, save_post
+from blogger import create_json_ld, save_post, create_post
 
 # Environment Variables
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -41,7 +41,7 @@ def parse_gemini_output(generated_text):
     search_description = desc_match.group(1).strip() if desc_match else ""
     
     labels_raw = labels_match.group(1).strip() if labels_match else ""
-    # লেবেলগুলোকে নিখুঁতভাবে পার্স ও ক্লিন করার নতুন লজিক
+    # লেবেলগুলোকে নিখুঁতভাবে পার্স ও ক্লিন করার লজিক
     labels = []
     if labels_raw:
         labels_raw = labels_raw.replace('[', '').replace(']', '').replace('"', '').replace("'", "")
@@ -65,7 +65,7 @@ def main():
     keywords = research_keywords(category, topic)
     print(f"🔑 Keywords: {keywords}")
 
-    # ৩. Article Generation (gemini_writer স্বয়ংক্রিয়ভাবে blog_posts.json থেকে আসল লিংক যোগ করবে)
+    # ৩. Article Generation
     raw_article = generate_article(topic, category, keywords)
     title, search_description, labels, content = parse_gemini_output(raw_article)
 
@@ -95,45 +95,27 @@ def main():
     # সার্চ ডেসক্রিপশন সর্বোচ্চ ১৫০ অক্ষরে সীমাবদ্ধ রাখা
     search_description = search_description[:150]
 
-    # ৮. Format Content with Schema & Responsive Blogger Featured Image
+    # ৮. Publish to Blogger using blogger.py's create_post function
     try:
-        schema = create_json_ld(title, search_description, img_url)
-    except Exception:
-        schema = ""
-        
-    image_html = ""
-    if img_url:
-        image_html = f'''
-<div class="separator" style="clear: both; text-align: center; margin-bottom: 25px;">
-    <a href="{img_url}" style="margin-left: auto; margin-right: auto; display: block;">
-        <img border="0" src="{img_url}" alt="{title}" title="{title}" loading="eager" style="max-width:100%; width:100%; height:auto; object-fit:cover; border-radius:8px;" />
-    </a>
-</div>
-<br/>
-'''
-    final_content = schema + image_html + content
-
-    # ৯. Publish to Blogger
-    blogger_service = get_blogger_service()
-    body = {
-        "kind": "blogger#post",
-        "title": title,
-        "content": final_content,
-        "labels": labels if labels else [category],
-        "searchDescription": search_description
-    }
-
-    res = blogger_service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
-    published_url = res.get('url')
-    print(f"✅ Successfully Published: {published_url}")
-    
-    # ১০. Save Post & Topic Data (Blogger থেকে পাওয়া আসল URL সেভ করা হচ্ছে)
-    try:
-        save_post(title, published_url, category)
-        save_topic(topic)
-        print("💾 Post and Topic history saved successfully.")
+        res = create_post(
+            title=title,
+            content=content,
+            labels=labels if labels else [category],
+            search_description=search_description,
+            image_url=img_url
+        )
+        published_url = res.get('url')
+        print(f"✅ Successfully Published: {published_url}")
     except Exception as e:
-        print(f"⚠️ Failed to save post history: {e}")
+        print(f"❌ Failed to publish post: {e}")
+        return
+
+    # ৯. Save Topic Data
+    try:
+        save_topic(topic)
+        print("💾 Topic history saved successfully.")
+    except Exception as e:
+        print(f"⚠️ Failed to save topic history: {e}")
 
 if __name__ == "__main__":
     main()
