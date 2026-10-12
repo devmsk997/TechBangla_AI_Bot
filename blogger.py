@@ -57,11 +57,10 @@ def create_json_ld(title, description, image_url):
 def create_post(title, content, labels=None, search_description=None, image_url=None):
     service = get_service()
 
-    # লেবেল নিখুঁতভাবে পার্স ও ক্লিন করার নতুন শক্তিশালী লজিক
+    # লেবেল নিখুঁতভাবে পার্স ও ক্লিন করার চূড়ান্ত লজিক
     formatted_labels = []
     if labels:
         if isinstance(labels, str):
-            # যদি লেবেলগুলো কমা বা অন্য কোনো চিহ্নে জোড়া থাকে, তবে কমা ধরে আলাদা করব
             raw_list = labels.split(',')
         elif isinstance(labels, list):
             raw_list = []
@@ -75,14 +74,12 @@ def create_post(title, content, labels=None, search_description=None, image_url=
 
         for tag in raw_list:
             cleaned = tag.strip()
-            # যদি ট্যাগের ভেতরে ভুলবশত কোনো কোটেশন বা অতিরিক্ত কমা থাকে তা মুছে ফেলা
             cleaned = cleaned.replace('"', '').replace("'", "").strip(',')
             if cleaned and cleaned not in formatted_labels:
                 formatted_labels.append(cleaned)
 
     schema = create_json_ld(title, search_description, image_url)
 
-    # ব্লগার ফ্রেন্ডলি স্ট্যান্ডার্ড ফিচার্ড ইমেজ ট্যাগ
     image_html = ""
     if image_url:
         image_html = f'''
@@ -102,6 +99,7 @@ def create_post(title, content, labels=None, search_description=None, image_url=
         "content": final_content
     }
 
+    # ব্লগার API-তে লেবেলগুলো নিশ্চিতভাবে পাইথন লিস্ট আকারে পাস করা হচ্ছে
     if formatted_labels:
         post["labels"] = formatted_labels
 
@@ -117,7 +115,6 @@ def create_post(title, content, labels=None, search_description=None, image_url=
     print("Published successfully:")
     print(result.get("url"))
 
-    # পোস্ট হিস্ট্রি আপডেট রাখা
     save_post(
         title,
         result.get("url", ""),
