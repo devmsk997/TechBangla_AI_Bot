@@ -1,5 +1,6 @@
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 import os
@@ -13,14 +14,34 @@ SCOPES = ["https://www.googleapis.com/auth/blogger"]
 
 def get_service():
     creds = None
-    if os.path.exists("token.json"):
+    
+    # গিটহাব এনভায়রনমেন্ট ভ্যারিয়েবল (Secrets) থেকে টোকেন চেক করা
+    token_json_env = os.environ.get("GOOGLE_TOKEN_JSON") or os.environ.get("TOKEN_JSON")
+    credentials_json_env = os.environ.get("GOOGLE_CREDENTIALS_JSON") or os.environ.get("CREDENTIALS_JSON")
+
+    if token_json_env:
+        try:
+            token_data = json.loads(token_json_env)
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+        except Exception as e:
+            print(f"Error loading token from environment: {e}")
+
+    # যদি এনভায়রনমেন্টে না থাকে, তবে লোকাল token.json চেক করবে (লোকাল পিসির জন্য)
+    if not creds and os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
+    # যদি টোকেন ভ্যালিড না হয় এবং লোকাল credentials.json থাকে
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-        creds = flow.run_local_server(port=0)
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
+        if os.path.exists("credentials.json"):
+            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+            with open("token.json", "w") as token:
+                token.write(creds.to_json())
+        else:
+            if not creds:
+                raise Exception("❌ Blogger API Credentials and Token not found in Environment or Local Files.")
 
     return build("blogger", "v3", credentials=creds)
 
@@ -57,7 +78,7 @@ def create_json_ld(title, description, image_url):
 def create_post(title, content, labels=None, search_description=None, image_url=None):
     service = get_service()
 
-    # লেবেল নিখুঁতভাবে পার্স ও ক্লিন করার চূড়ান্ত লজিক
+    # লেবেল নিখুঁতভাবে পার্স ও ক্লিন করার চূড়ান্ত লজিক
     formatted_labels = []
     if labels:
         if isinstance(labels, str):
