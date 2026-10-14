@@ -30,7 +30,7 @@ def generate_article(topic, category, keywords):
     keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
     current_year = "2026"
 
-    # blog_posts.json থেকে আগের পোস্টগুলোর লিস্ট নেওয়া
+    # blog_posts.json থেকে আগের পোস্টগুলোর লিস্ট নেওয়া
     existing_posts = get_available_posts_for_linking()
     linking_instructions = ""
     
@@ -50,7 +50,7 @@ Target Keywords: {keywords_str}
 {linking_instructions}
 
 STRICT REQUIREMENTS:
-1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text.
+1. Current Year is strictly {current_year}. NEVER use 2024 or 2025 anywhere in the title, headers, or body text
 2. TITLE LENGTH: The SEO Title in Bengali MUST be strictly within 60 characters (max 60 characters). Keep it concise and attractive.
 3. ARTICLE LENGTH: Write an extensive, deep-dive article containing at least 2000 words. Expand all sections thoroughly with detailed explanations, steps, and examples.
 4. CONTEXTUAL INTERNAL LINKING: Naturally weave at least 2 to 3 internal links from the "Available posts" list above into the body paragraphs using meaningful anchor texts in Bengali. Format as HTML: <a href="URL">Anchor Text</a>. Do NOT put them in a footer box; integrate them smoothly into sentences.
@@ -95,10 +95,8 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # সমস্ত ফ্রি ও এভেইলেবল ফ্লাশ মডেলগুলোর দীর্ঘ সিরিয়াল চেইন
+    # সবচেয়ে স্থিতিশীল এবং নির্ভরযোগ্য ফ্রি ফ্লাশ মডেলগুলোর তালিকা (Fallback Chain)
     models_to_try = [
-        'gemini-3.8-flash',
-        'gemini-3.5-flash',
         'gemini-2.5-flash',
         'gemini-2.0-flash',
         'gemini-1.5-flash',
@@ -126,7 +124,7 @@ CONTENT:
                     print(f"⏳ Server is busy. Waiting 5 seconds before retrying...")
                     time.sleep(5)
                 else:
-                    break # 404 বা অন্য এরর হলে সাথে সাথে সিরিয়ালের পরের মডেলে চলে যাবে
+                    break # অন্য কোনো এরর হলে সিরিয়ালের পরের মডেলে চলে যাবে
         
         print(f"🔄 Moving to the next model in sequence...")
 
