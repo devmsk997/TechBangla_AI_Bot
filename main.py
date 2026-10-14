@@ -3,9 +3,6 @@ import json
 import time
 import re
 from google import genai
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 
 # SEO & Bot Modules Import
 from topic_cluster import choose_topic, save_topic
@@ -20,16 +17,6 @@ from blogger import create_json_ld, save_post, create_post
 # Environment Variables
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
-CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON") or os.environ.get("CREDENTIALS_JSON")
-TOKEN_JSON = os.environ.get("GOOGLE_TOKEN_JSON") or os.environ.get("TOKEN_JSON")
-
-def get_blogger_service():
-    token_data = json.loads(TOKEN_JSON)
-    creds = Credentials.from_authorized_user_info(token_data)
-    if creds and creds.expired and creds.refresh_token:
-        client_data = json.loads(CREDENTIALS_JSON)
-        creds.refresh(Request())
-    return build('blogger', 'v3', credentials=creds)
 
 def parse_gemini_output(generated_text):
     title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text, re.IGNORECASE)
