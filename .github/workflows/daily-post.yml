@@ -68,25 +68,7 @@ jobs:
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
           printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
 
-          cat > config.py <<'PY'
-          import json
-          import os
-
-          GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-          BLOG_ID = os.environ.get("BLOG_ID", "")
-          GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-          GITHUB_USERNAME = "devmsk997"
-          GITHUB_REPO = "techbangla-image-hosting"
-
-          try:
-              _oauth = json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}"))
-              _oauth = _oauth.get("installed") or _oauth.get("web") or {}
-              CLIENT_SECRET = _oauth.get("client_secret", "")
-              CLIENT_ID = _oauth.get("client_id", "")
-          except Exception:
-              CLIENT_SECRET = ""
-              CLIENT_ID = ""
-          PY
+          printf 'import json\nimport os\n\nGEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")\nBLOG_ID = os.environ.get("BLOG_ID", "")\nGITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")\nGITHUB_USERNAME = "devmsk997"\nGITHUB_REPO = "techbangla-image-hosting"\n\ntry:\n    _oauth = json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}"))\n    _oauth = _oauth.get("installed") or _oauth.get("web") or {}\n    CLIENT_SECRET = _oauth.get("client_secret", "")\n    CLIENT_ID = _oauth.get("client_id", "")\nexcept Exception:\n    CLIENT_SECRET = ""\n    CLIENT_ID = ""\n' > config.py
 
       - name: Publish one blog post
         run: python main.py
