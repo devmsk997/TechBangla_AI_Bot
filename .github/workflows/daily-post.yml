@@ -23,7 +23,6 @@ jobs:
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-      GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
       BLOG_ID: ${{ secrets.BLOG_ID }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,29 +55,23 @@ jobs:
             echo "::error::Missing repository secret: GOOGLE_CREDENTIALS_JSON"
             exit 1
           fi
-          if [ -z "${GOOGLE_TOKEN_JSON:-}" ]; then
-            echo "::error::Missing repository secret: GOOGLE_TOKEN_JSON"
-            exit 1
-          fi
           if [ -z "${BLOG_ID:-}" ]; then
             echo "::error::Missing repository secret: BLOG_ID"
             exit 1
           fi
 
+          # শুধুমাত্র credentials.json ফাইলটি সিক্রেট থেকে তৈরি করা হবে (token.json এখন রিপোজিটরিতে ডাইরেক্ট আছে)
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
-          printf '%s' "$GOOGLE_TOKEN_JSON" > token.json
 
           printf 'import json\nimport os\n\nGEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")\nBLOG_ID = os.environ.get("BLOG_ID", "")\nGITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")\nGITHUB_USERNAME = "devmsk997"\nGITHUB_REPO = "techbangla-image-hosting"\n\ntry:\n    _oauth = json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}"))\n    _oauth = _oauth.get("installed") or _oauth.get("web") or {}\n    CLIENT_SECRET = _oauth.get("client_secret", "")\n    CLIENT_ID = _oauth.get("client_id", "")\nexcept Exception:\n    CLIENT_SECRET = ""\n    CLIENT_ID = ""\n' > config.py
 
       - name: Publish one blog post
-        run: |
-          python main.py || python -c "import traceback; print('=== ERROR TRACEBACK ==='); traceback.print_exc()"
-          exit 1
+        run: python main.py
 
       - name: Remove private runtime files
         if: always()
         shell: bash
-        run: rm -f config.py credentials.json token.json
+        run: rm -f config.py credentials.json
 
       - name: Save bot state
         if: success()
