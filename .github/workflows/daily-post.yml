@@ -71,7 +71,9 @@ jobs:
           printf 'import json\nimport os\n\nGEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")\nBLOG_ID = os.environ.get("BLOG_ID", "")\nGITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")\nGITHUB_USERNAME = "devmsk997"\nGITHUB_REPO = "techbangla-image-hosting"\n\ntry:\n    _oauth = json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}"))\n    _oauth = _oauth.get("installed") or _oauth.get("web") or {}\n    CLIENT_SECRET = _oauth.get("client_secret", "")\n    CLIENT_ID = _oauth.get("client_id", "")\nexcept Exception:\n    CLIENT_SECRET = ""\n    CLIENT_ID = ""\n' > config.py
 
       - name: Publish one blog post
-        run: python main.py
+        run: |
+          python main.py || python -c "import traceback; print('=== ERROR TRACEBACK ==='); traceback.print_exc()"
+          exit 1
 
       - name: Remove private runtime files
         if: always()
