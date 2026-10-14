@@ -15,9 +15,18 @@ from image_generator import generate_image
 from quality_score import calculate_quality_score
 from blogger import create_json_ld, save_post, create_post
 
-# Environment Variables
+# Environment Variables & Debugging
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
+CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+TOKEN_JSON = os.environ.get("GOOGLE_TOKEN_JSON")
+
+print("--- DEBUG ENVIRONMENT INFO ---")
+print(f"GEMINI_API_KEY Available: {bool(GEMINI_API_KEY)}")
+print(f"BLOG_ID: {BLOG_ID}")
+print(f"GOOGLE_CREDENTIALS_JSON Length: {len(CREDENTIALS_JSON) if CREDENTIALS_JSON else 'MISSING'}")
+print(f"GOOGLE_TOKEN_JSON Length: {len(TOKEN_JSON) if TOKEN_JSON else 'MISSING'}")
+print("------------------------------")
 
 def parse_gemini_output(generated_text):
     title_match = re.search(r"TITLE:\s*(.*?)\n", generated_text, re.IGNORECASE)
@@ -98,8 +107,9 @@ def main():
         print("💾 Topic history saved successfully.")
 
     except Exception as e:
-        print("❌ CRITICAL ERROR IN MAIN:")
+        print("\n❌ ================= CRITICAL ERROR TRACEBACK =================")
         traceback.print_exc()
+        print("==============================================================\n")
         raise e
 
 if __name__ == "__main__":
