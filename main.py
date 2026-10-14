@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import traceback
 import re
 from google import genai
 
@@ -28,7 +29,6 @@ def parse_gemini_output(generated_text):
     search_description = desc_match.group(1).strip() if desc_match else ""
     
     labels_raw = labels_match.group(1).strip() if labels_match else ""
-    # লেবেলগুলোকে নিখুঁতভাবে পার্স ও ক্লিন করার লজিক
     labels = []
     if labels_raw:
         labels_raw = labels_raw.replace('[', '').replace(']', '').replace('"', '').replace("'", "")
@@ -42,48 +42,47 @@ def parse_gemini_output(generated_text):
     return title, search_description, labels, content
 
 def main():
-    print("🚀 TechBangla SEO Auto-Post Bot Started")
-    
-    # ১. Topic & Category Selection
-    topic, category = choose_topic()
-    print(f"📌 Topic: {topic} | Category: {category}")
-
-    # ২. Keyword Research
-    keywords = research_keywords(category, topic)
-    print(f"🔑 Keywords: {keywords}")
-
-    # ৩. Article Generation
-    raw_article = generate_article(topic, category, keywords)
-    title, search_description, labels, content = parse_gemini_output(raw_article)
-
-    # ৪. Duplicate Check
-    dup_res = check_duplicate(title, content)
-    if dup_res.get("duplicate"):
-        print(f"⚠️ Duplicate detected ({dup_res.get('similarity')}% similarity). Skipping generation.")
-        return
-
-    # ৫. Quality & SEO Check
-    q_score = calculate_quality_score(title, content)
-    print(f"📊 Quality Score: {q_score['score']}/100")
-
-    # ৬. Image Generation
     try:
-        img_url = generate_image(title)
-        print(f"🖼️ Final Image URL for Blogger: {img_url}")
-    except Exception as e:
-        print(f"⚠️ Image generation skipped: {e}")
-        img_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280&auto=format&fit=crop"
-
-    # ৭. SEO Optimization Payload
-    seo_data = optimize_seo(title, content, category)
-    if not search_description:
-        search_description = seo_data.get("search_description", "")
+        print("🚀 TechBangla SEO Auto-Post Bot Started")
         
-    # সার্চ ডেসক্রিপশন সর্বোচ্চ ১৫০ অক্ষরে সীমাবদ্ধ রাখা
-    search_description = search_description[:150]
+        # ১. Topic & Category Selection
+        topic, category = choose_topic()
+        print(f"📌 Topic: {topic} | Category: {category}")
 
-    # ৮. Publish to Blogger using blogger.py's create_post function
-    try:
+        # ২. Keyword Research
+        keywords = research_keywords(category, topic)
+        print(f"🔑 Keywords: {keywords}")
+
+        # ৩. Article Generation
+        raw_article = generate_article(topic, category, keywords)
+        title, search_description, labels, content = parse_gemini_output(raw_article)
+
+        # ৪. Duplicate Check
+        dup_res = check_duplicate(title, content)
+        if dup_res.get("duplicate"):
+            print(f"⚠️ Duplicate detected ({dup_res.get('similarity')}% similarity). Skipping generation.")
+            return
+
+        # ৫. Quality & SEO Check
+        q_score = calculate_quality_score(title, content)
+        print(f"📊 Quality Score: {q_score['score']}/100")
+
+        # ৬. Image Generation
+        try:
+            img_url = generate_image(title)
+            print(f"🖼️ Final Image URL for Blogger: {img_url}")
+        except Exception as e:
+            print(f"⚠️ Image generation skipped: {e}")
+            img_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280&auto=format&fit=crop"
+
+        # ৭. SEO Optimization Payload
+        seo_data = optimize_seo(title, content, category)
+        if not search_description:
+            search_description = seo_data.get("search_description", "")
+            
+        search_description = search_description[:150]
+
+        # ৮. Publish to Blogger
         res = create_post(
             title=title,
             content=content,
@@ -93,16 +92,15 @@ def main():
         )
         published_url = res.get('url')
         print(f"✅ Successfully Published: {published_url}")
-    except Exception as e:
-        print(f"❌ Failed to publish post: {e}")
-        return
 
-    # ৯. Save Topic Data
-    try:
+        # ৯. Save Topic Data
         save_topic(topic)
         print("💾 Topic history saved successfully.")
+
     except Exception as e:
-        print(f"⚠️ Failed to save topic history: {e}")
+        print("❌ CRITICAL ERROR IN MAIN:")
+        traceback.print_exc()
+        raise e
 
 if __name__ == "__main__":
     main()
