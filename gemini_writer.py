@@ -95,11 +95,11 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
+    # বর্তমান উপলব্ধ এবং সাপোর্টেড মডেলগুলোর সঠিক সিকোয়েন্স (Free SDK compatible)
     models_to_try = [
         'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest'
+        'gemini-2.0-flash-exp',
+        'gemini-2.0-flash'
     ]
 
     max_retries = 2
