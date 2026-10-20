@@ -95,17 +95,18 @@ CONTENT:
 [Conclusion text in Bengali]
 """
 
-    # গুগল প্রদত্ত অফিশিয়াল সাজেশন অনুযায়ী মডেল সিকোয়েন্স আপডেট করা হলো
+    # সচল ও ফ্রি মডেল লিস্ট আপডেট (গুগল অফিসিয়াল সাপোর্ট অনুযায়ী)
     models_to_try = [
         'gemini-3.8-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
+        'gemini-2.5-flash-lite',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro'
     ]
 
-    max_retries = 2
+    max_retries_per_model = 3
 
     for model_name in models_to_try:
-        for attempt in range(max_retries):
+        for attempt in range(max_retries_per_model):
             try:
                 print(f"🔄 Requesting Free Model ({model_name}) - Attempt {attempt + 1}...")
                 response = client.models.generate_content(
@@ -114,17 +115,23 @@ CONTENT:
                 )
                 
                 raw_article = response.text
-                print(f"✅ Successfully generated article using model: {model_name}")
-                return raw_article
+                if raw_article:
+                    print(f"✅ Successfully generated article using model: {model_name}")
+                    return raw_article
 
             except Exception as e:
-                print(f"⚠️ Model {model_name} failed on attempt {attempt + 1} due to: {e}")
-                if "503" in str(e) or "UNAVAILABLE" in str(e):
-                    print(f"⏳ Server is busy. Waiting 5 seconds before retrying...")
-                    time.sleep(5)
+                err_str = str(e)
+                print(f"⚠️ Model {model_name} failed on attempt {attempt + 1} due to: {err_str}")
+                
+                # ৫০৩ (Server Busy / High Demand) আসলে কিছুটা সময় বিরতি দিয়ে আবার চেষ্টা করবে
+                if "503" in err_str or "UNAVAILABLE" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    wait_time = (attempt + 1) * 10  # ১০ সেকেন্ড, ২০ সেকেন্ড, ৩০ সেকেন্ড ওয়েট করবে
+                    print(f"⏳ Server is busy. Waiting {wait_time} seconds before retrying...")
+                    time.sleep(wait_time)
                 else:
+                    # ৪০৪ (মডেল না পাওয়া গেলে) সরাসরি পরের মডেলে চলে যাবে
                     break
         
-        print(f"🔄 Moving to the next model in sequence...")
+        print(f"🔄 Moving to the next active free model in sequence...")
 
     raise Exception("❌ All Free Gemini API models failed sequentially due to high demand or capacity limits.")
